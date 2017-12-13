@@ -2046,6 +2046,10 @@ void adc0_isr(void) {
   // digitalWriteFast(LED_POWER, HIGH); //debug
 
   adc0Value = adc->adc0->readSingle();
+  
+  if (adc0Value < 0) { // prevent false results of 0xFFFF
+  adc0Value = 0;
+  }
   // clear old values
   adc0_buffer[analogBufferIndex] = 0;
   peak[analogBufferIndex] = 0;
@@ -2293,7 +2297,7 @@ void checkModbus() {
   
   if (!dataSent) {
     for (byte i = 0; i < (AN_VALUES_END - AN_VALUES); i++) {
-      // holdingRegs[i+AN_VALUES] = value_buffer[i*8];
+      //holdingRegs[i+AN_VALUES] = value_buffer[i*8];
       holdingRegs[i+AN_VALUES] = value_buffer[i*8+4]<<8 | value_buffer[i*8];   // MSB = value_buffer[i*8+4] , LSB = value_buffer[i*8] ; only 50 of 200
     }
 

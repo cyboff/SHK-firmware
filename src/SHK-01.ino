@@ -2050,6 +2050,7 @@ void adc0_isr(void) {
   if (adc0Value < 0) { // prevent false results of 0xFFFF
   adc0Value = 0;
   }
+  
   // clear old values
   adc0_buffer[analogBufferIndex] = 0;
   peak[analogBufferIndex] = 0;

@@ -55,7 +55,7 @@
 
 // EEPROM Addresses for config
 #define EE_ADDR_modbus_ID                            0x06 // WORD
-#define EE_ADDR_modbus_Speed                         0x08 // WORD  baudrate/100 to fit 115200 to WORD
+#define EE_ADDR_modbus_Speed                         0x08 // WORD  // baudrate/100 to fit 115200 to WORD
 #define EE_ADDR_modbus_Format                        0x10 // WORD
 
 #define EE_ADDR_set                                  0x12 // WORD  // RELAY = 0 (REL1 || REL2), MAN1 = 1, MAN2 = 2
@@ -67,12 +67,12 @@
 #define EE_ADDR_window_begin                         0x22 // WORD
 #define EE_ADDR_window_end                           0x24 // WORD
 #define EE_ADDR_position_mode                        0x26 // WORD  // positionMode: HMD = 0, RISE = 1, FALL = 2, PEAK = 3
-#define EE_ADDR_analog_out_mode                      0x28 // WORD  an1/an2: "1Int2Pos" = 0, "1Pos2Int2" = 1, "1Int2Int" = 2, "1Pos2Pos" = 3
-#define EE_ADDR_position_offset                      0x30 // WORD  offset for position
+#define EE_ADDR_analog_out_mode                      0x28 // WORD  // an1/an2: "1Int2Pos" = 0, "1Pos2Int" = 1, "1Int2Int" = 2, "1Pos2Pos" = 3
+#define EE_ADDR_position_offset                      0x30 // WORD  // offset for position
 
-#define EE_ADDR_filter_position                      0x32 // WORD  range 0 - 9999 ms
-#define EE_ADDR_filter_on                            0x34 // WORD  range 0 - 9999 ms
-#define EE_ADDR_filter_off                           0x36 // WORD  range 0 - 9999 ms
+#define EE_ADDR_filter_position                      0x32 // WORD  // range 0 - 9999 ms
+#define EE_ADDR_filter_on                            0x34 // WORD  // range 0 - 9999 ms
+#define EE_ADDR_filter_off                           0x36 // WORD  // range 0 - 9999 ms
 
 // EEPROM Addresses for diagnosis
 #define EE_ADDR_max_temperature                      0x38 // WORD
@@ -258,25 +258,25 @@ enum
   MB_MODEL_SERIAL_NUMBER,
   MB_FW_VERSION,
 
-  MODBUS_ID,
+  MODBUS_ID, // address 1..247
   MODBUS_SPEED, // baud rate/100 to fit into word
-  MODBUS_FORMAT,
+  MODBUS_FORMAT, // SERIAL_8N1 = 0, SERIAL_8E1 = 6, SERIAL_8O1 = 7 , SERIAL_8N2 = 4
 
-  SET,
-  GAIN_SET1,
-  THRESHOLD_SET1,
-  GAIN_SET2,
-  THRESHOLD_SET2,
+  SET, // RELAY = 0 (REL1 || REL2), MAN1 = 1, MAN2 = 2
+  GAIN_SET1, // valid values 1,2,4,8,16,32,64
+  THRESHOLD_SET1, // min 20, max 80
+  GAIN_SET2, // valid values 1,2,4,8,16,32,64
+  THRESHOLD_SET2, // min 20, max 80
 
-  WINDOW_BEGIN,
-  WINDOW_END,
-  POSITION_MODE,
-  ANALOG_OUT_MODE,
-  POSITION_OFFSET,
+  WINDOW_BEGIN, // min 5, max 50
+  WINDOW_END, // min 50 max 95
+  POSITION_MODE, // hmd = 0, rising = 1, falling = 2, peak = 3
+  ANALOG_OUT_MODE, // an1/an2: "1Int2Pos" = 0, "1Pos2Int" = 1, "1Int2Int" = 2, "1Pos2Pos" = 3
+  POSITION_OFFSET, // min 5, max 95 to avoid coincidence with pulse interrupts
 
-  FILTER_POSITION,
-  FILTER_ON,
-  FILTER_OFF,
+  FILTER_POSITION, // range 0 - 9999 ms (or nr of mirrors) for moving average
+  FILTER_ON, // range 0 - 9999 ms
+  FILTER_OFF, // range 0 - 9999 ms
 
   ACT_TEMPERATURE,
   MAX_TEMPERATURE,
@@ -1440,7 +1440,7 @@ void showAnalogMenu(void) {
   if (currentMenuOption == 0) displayPrint("wBeg%3d%%", windowBegin);
   if (currentMenuOption == 1) displayPrint("wEnd%3d%%", windowEnd);
   if (currentMenuOption == 2) displayPrint("mPos%s", menu_positionModeDisp[positionMode]);
-  if (currentMenuOption == 3) displayPrint("mAn %s", menu_analogOutModeDisp[analogOutMode]);
+  if (currentMenuOption == 3) displayPrint("AnO %s", menu_analogOutModeDisp[analogOutMode]);
   if (currentMenuOption == 4) displayPrint("Offs%3d%%", positionOffset);
 
 
@@ -1582,7 +1582,7 @@ void setAnalogOutMode(void) {
   if (!menuTimeout) menuTimeout = TIMEOUT_MENU;
 
   // positionMode: HMD = 0, RISE = 1, FALL = 2, PEAK = 3
-  if (blinkMenu) displayPrint("mAn %s", menu_analogOutModeDisp[menu_analogOutMode]); else displayPrint("    %s", menu_analogOutModeDisp[menu_analogOutMode]);
+  if (blinkMenu) displayPrint("AnO %s", menu_analogOutModeDisp[menu_analogOutMode]); else displayPrint("    %s", menu_analogOutModeDisp[menu_analogOutMode]);
 
   if (lastKey == BTN_A) {  // increment by 1
     if (menu_analogOutMode < 3 ) menu_analogOutMode++; else menu_analogOutMode = 0;

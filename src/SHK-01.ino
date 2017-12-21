@@ -2166,6 +2166,17 @@ void updateResults() {
 
   positionValue = map(positionValue,windowBegin*10,windowEnd*10,0,65535); //remap for DAC range
 
+  if (extTest || intTest) // check test mode and set outputs to 50% and 12mA 
+  {
+    peakValueDisp = 128;          //for display range 0 - 256
+    positionValueDisp = 500;      //for display range 0 - 1000
+    positionValueAvgDisp = 500;   //for display range 0 - 1000
+    positionValue = 32768;        //for analog output 
+    
+    digitalWriteFast(LED_SIGNAL, HIGH);
+    digitalWriteFast(OUT_SIGNAL, HIGH);
+  } 
+
   switch (analogOutMode) { //an1/an2: "1Int2Pos" = 0, "1Pos2Int" = 1, "1Int2Int" = 2, "1Pos2Pos" = 3
     case 0: updateSPI((peakValueDisp<<8), positionValue); // range is 2x 16bit
      break;
@@ -2174,6 +2185,7 @@ void updateResults() {
     case 2: updateSPI((peakValueDisp<<8),(peakValueDisp<<8));
      break;
     case 3: updateSPI(positionValue, positionValue);
+     break;
   }
 
   if (dataSent && motorPulseIndex == 0) { // prepare data for visualization on PC, only one mirror

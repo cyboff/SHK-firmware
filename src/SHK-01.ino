@@ -20,7 +20,7 @@
 
 //for ModBus
 #include <SimpleModbusSlave.h>
-
+ 
 //defaults EEPROM
 #define MODEL_TYPE                                  50
 #define MODEL_SERIAL_NUMBER                         18001
@@ -84,6 +84,7 @@
 #define FILTER_PIN 24 // not connected, for internal use of Bounce2 library filter - SIGNAL PRESENT filter ON/OFF
 
 Bounce filterOnOff = Bounce();
+float sma = 0;
 
 // Modbus - RS485
 
@@ -340,8 +341,8 @@ volatile int positionValue = 0, positionValueDisp = 0;
 volatile int positionValueAvg = 0, positionValueAvgDisp = 0;
 
 // position running average filter 
-#define LM_SIZE 10000 // max size reserved for filterPosition 0 - 9999 ms
-volatile static int LM[LM_SIZE];      // LastMeasurements
+// #define LM_SIZE 10000 // max size reserved for filterPosition 0 - 9999 ms
+// volatile static int LM[LM_SIZE];      // LastMeasurements
 
 // button interrupt
 #define STATE_NORMAL 0
@@ -406,7 +407,7 @@ void setup() {
 
   EEPROM_init();
 
-  //initialize SIGNAL PRESENT filter
+  //initialize filters
   pinMode(FILTER_PIN, OUTPUT);
   digitalWriteFast(FILTER_PIN, LOW);
   filterOnOff.attach(FILTER_PIN);
@@ -507,10 +508,9 @@ void loop() {
 
   // clear position filter array
   if (filterOnOff.fell()) { 
-    for (int i=0; i<LM_SIZE;i++)
-    {
-      LM[i] = 0;
-    }
+    
+    
+    
   }
 
   // check SET
@@ -2151,8 +2151,9 @@ void updateResults() {
      break;
   }
    
-  positionValueAvg = runningAverage(positionValueDisp);
+  //positionValueAvg = runningAverage(positionValueDisp);
   
+  positionValueAvg = approxSimpleMovingAverage(positionValueDisp, filterPosition);
   
   // remap and send to SPI
   positionValue = constrain(positionValueAvg, windowBegin*10, windowEnd*10); // only within measuring window
@@ -2208,56 +2209,69 @@ void updateResults() {
   adc->enableInterrupts(ADC_0);
 }
 
-long runningAverage(int M) {
-  // #define LM_SIZE 10000 // max size reserved for filterPosition 0 - 9999 ms
-  // static int LM[LM_SIZE];      // LastMeasurements
-  static int index = 0;
-  // static int clear = 0;
-  static long sum = 0;
-  static int count = 0;
-
+// exponential moving average
+long approxSimpleMovingAverage(int new_value, int period) {
+  
   if (filterPosition) { // avoid div/0
-    
-    if (!digitalReadFast(OUT_SIGNAL)) { // clear values
-      // for (int i=0; i < filterPosition; i++) {
-      //   LM[i] = 0;
-      // } 
-      // ^ can't be used - too slow for more then 3000 values
-      // LM[clear] = 0;
-      // clear++;
-      // clear = clear % filterPosition;
+  if (!digitalReadFast(OUT_SIGNAL)) { // clear values
+  sma = 0;
+  } else {
+  sma *= (period - 1);
+  sma += new_value;
+  sma /= period;
+  }
+  return sma;
+  } else return new_value;
 
-      index = 0;
-      sum = 0;
-      count = 0;
-      
-      return 0;
-    } 
-    else 
-    {
-    // clear = 0;
-
-    // keep sum updated to improve speed.
-    sum -= LM[index];
-    LM[index] = M;
-    sum += LM[index];
-    index++;
-
-    // index = index % LM_SIZE;
-    // if (count < LM_SIZE) count++;
-    index = index % filterPosition;
-    if (count < filterPosition) count++;
-
-    return sum / count;
-    }
-  } else return M;
 }
 
-// double approxRollingAverage (double avg, double input) {
-//     avg -= avg/N;
-//     avg += input/N;
-//     return avg;
+
+
+// long runningAverage(int M) {
+//   // #define LM_SIZE 10000 // max size reserved for filterPosition 0 - 9999 ms
+//   // static int LM[LM_SIZE];      // LastMeasurements
+//   static int index = 0;
+//   // static int clear = 0;
+//   static long sum = 0;
+//   static int count = 0;
+
+//   if (filterPosition) { // avoid div/0
+    
+//     if (!digitalReadFast(OUT_SIGNAL)) { // clear values
+//       // for (int i=0; i < filterPosition; i++) {
+//       //   LM[i] = 0;
+//       // } 
+//       // ^ can't be used - too slow for more then 3000 values
+//       // LM[clear] = 0;
+//       // clear++;
+//       // clear = clear % filterPosition;
+
+//       index = 0;
+//       sum = 0;
+//       count = 0;
+      
+//       return 0;
+//     } 
+//     else 
+//     {
+//     // clear = 0;
+
+//     // keep sum updated to improve speed.
+//     sum -= LM[index];
+//     LM[index] = M;
+//     sum += LM[index];
+//     index++;
+
+//     // index = index % LM_SIZE;
+//     // if (count < LM_SIZE) count++;
+//     index = index % filterPosition;
+//     if (count < filterPosition) count++;
+
+//     return sum / count;
+//     }
+//   } else return M;
 // }
+
 
 void checkSTATUS() {
   bitWrite(io_state, IO_LASER, digitalRead(LASER));

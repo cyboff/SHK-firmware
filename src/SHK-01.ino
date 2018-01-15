@@ -2609,18 +2609,18 @@ void updateResults()
   adc->disableInterrupts(ADC_0);
 
   // check SIGNAL PRESENT
-  if (peakValue > thre256 + hmdThresholdHyst)
-  {
-    digitalWriteFast(FILTER_PIN, HIGH); // update internal pin for bounce2 filter
-    digitalWriteFast(LED_SIGNAL, HIGH);
-    //digitalWriteFast(OUT_SIGNAL,HIGH);
-  }
-
   if (peakValue < thre256 - hmdThresholdHyst)
   {
     digitalWriteFast(FILTER_PIN, LOW);
     digitalWriteFast(LED_SIGNAL, LOW);
     //digitalWriteFast(OUT_SIGNAL, LOW);
+  }
+
+  if ((peakValue > thre256 + hmdThresholdHyst) || extTest || intTest)
+  {
+    digitalWriteFast(FILTER_PIN, HIGH); // update internal pin for bounce2 filter
+    digitalWriteFast(LED_SIGNAL, HIGH);
+    //digitalWriteFast(OUT_SIGNAL,HIGH);
   }
 
   // update SIGNAL PRESENT bounce2 filter
@@ -2669,9 +2669,6 @@ void updateResults()
     positionValueDisp = 500;    //for display range 0 - 1000
     positionValueAvgDisp = 500; //for display range 0 - 1000
     positionValue = 32768;      //for analog output
-
-    digitalWriteFast(LED_SIGNAL, HIGH);
-    digitalWriteFast(OUT_SIGNAL, HIGH);
   }
 
   switch (analogOutMode)

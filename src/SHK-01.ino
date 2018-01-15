@@ -521,17 +521,15 @@ void loop()
 }
 
 // Display print wrapper
-int displayPrint(const char *format, ...)
+void displayPrint(const char *format, ...)
 {
-  char S[100];
-  int Res;
+  char S[10];
   va_list arg;
   va_start(arg, format);
-  Res = vsprintf(S, format, arg);
+  vsnprintf(S, sizeof(S), format, arg);
   va_end(arg);
   myDisplay.home();
   myDisplay.print(S);
-  return Res;
 }
 
 //***************************************************************************************

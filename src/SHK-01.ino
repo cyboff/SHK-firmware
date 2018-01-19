@@ -2610,14 +2610,14 @@ void updateResults()
   if (peakValue < thre256 - hmdThresholdHyst)
   {
     digitalWriteFast(FILTER_PIN, LOW);
-    digitalWriteFast(LED_SIGNAL, LOW);
+    // digitalWriteFast(LED_SIGNAL, LOW);
     //digitalWriteFast(OUT_SIGNAL, LOW);
   }
 
   if ((peakValue > thre256 + hmdThresholdHyst) || extTest || intTest)
   {
     digitalWriteFast(FILTER_PIN, HIGH); // update internal pin for bounce2 filter
-    digitalWriteFast(LED_SIGNAL, HIGH);
+    // digitalWriteFast(LED_SIGNAL, HIGH);
     //digitalWriteFast(OUT_SIGNAL,HIGH);
   }
 
@@ -2627,12 +2627,14 @@ void updateResults()
   if (filterOnOff.rose())
   {
     filterOnOff.interval(filterOff); // update filter interval
+    digitalWriteFast(LED_SIGNAL, HIGH);
     digitalWriteFast(OUT_SIGNAL, HIGH);
   }
 
   if (filterOnOff.fell())
   {
     filterOnOff.interval(filterOn); //update filter interval
+    digitalWriteFast(LED_SIGNAL, LOW);
     digitalWriteFast(OUT_SIGNAL, LOW);
   }
 

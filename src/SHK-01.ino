@@ -195,8 +195,9 @@ volatile int currentMenuOption = 0;
 
 // configure ADC
 
-#define ADC0_AVERAGING 4
+#define ADC0_AVERAGING 1
 #define ANALOG_BUFFER_SIZE 200
+unsigned int freq = 200000;
 
 ADC *adc = new ADC();                         // adc object
 volatile int adc0_buffer[ANALOG_BUFFER_SIZE]; // ADC_0 8-bit resolution
@@ -246,6 +247,7 @@ const char *menu_modbusFormatDisp[] = {"8N1", "8E1", "8O1", "8N2"};
 volatile boolean dataSent = false;
 int sendNextLn = 0;
 uint16_t io_state = 0;
+unsigned int exectime = 0;
 
 //////////////// registers of your slave ///////////////////
 enum
@@ -319,7 +321,7 @@ enum
 
 //IntervalTimer falseTimer;   // timer stops randomly if only one is defined
 IntervalTimer timer500us; // timer for motor speed and various timeouts
-IntervalTimer timerOffset;
+//IntervalTimer timerOffset;
 
 int startTimerValue0 = 0;
 
@@ -442,12 +444,12 @@ void setup()
 
   // it can be ADC_VERY_LOW_SPEED, ADC_LOW_SPEED, ADC_MED_SPEED, ADC_HIGH_SPEED_16BITS, ADC_HIGH_SPEED or ADC_VERY_HIGH_SPEED
   // see the documentation for more information
-  adc->setConversionSpeed(ADC_CONVERSION_SPEED::VERY_HIGH_SPEED); // change the conversion speed
+  adc->setConversionSpeed(ADC_CONVERSION_SPEED::VERY_HIGH_SPEED,ADC_0); // change the conversion speed
   // it can be ADC_VERY_LOW_SPEED, ADC_LOW_SPEED, ADC_MED_SPEED, ADC_HIGH_SPEED or ADC_VERY_HIGH_SPEED
-  adc->setSamplingSpeed(ADC_SAMPLING_SPEED::VERY_HIGH_SPEED); // change the sampling speed
+  adc->setSamplingSpeed(ADC_SAMPLING_SPEED::VERY_HIGH_SPEED,ADC_0); // change the sampling speed
   //adc->setReference(ADC_REF_3V3, ADC_0);
 
-  adc->enablePGA(pga);
+  adc->enablePGA(pga,ADC_0);
 
   // ADC1 for internal temperature measurement
 
@@ -457,11 +459,11 @@ void setup()
   adc->setSamplingSpeed(ADC_SAMPLING_SPEED::VERY_LOW_SPEED, ADC_1);     // change the sampling speed
 
   // read once for setup everything
-  adc->analogReadDifferential(A10, A11, ADC_0);             //start ADC_0 differential
+  //adc->analogReadDifferential(A10, A11, ADC_0);             //start ADC_0 differential
   adc->analogRead(ADC_INTERNAL_SOURCE::TEMP_SENSOR, ADC_1); //start ADC_1 single, temp sensor internal pin 38
 
   // adc->enableInterrupts(ADC_0);
-  adc->startContinuousDifferential(A10, A11, ADC_0);
+  //adc->startContinuousDifferential(A10, A11, ADC_0);
   adc->startContinuous(38, ADC_1); // do not want to accept ADC_INTERNAL_SOURCE::TEMP_SENSOR
 
   //motor configuration and startup
@@ -493,12 +495,14 @@ void setup()
 
   // when motor is running, enable ADC0 interrupts
   adc->enableInterrupts(ADC_0);
+  adc->analogReadDifferential(A10, A11, ADC_0);             //start ADC_0 differential
+  adc->adc0->stopPDB();
+  //NVIC_ENABLE_IRQ(IRQ_PDB); // enable interrupts
+  adc->adc0->startPDB(freq); //frequency in Hz
 }
 
 void loop()
 {
-  unsigned int starttime = micros();
-
   // check SET
   checkSET();
   // check TEST
@@ -517,7 +521,6 @@ void loop()
 
   //digitalWriteFast(LED_BUILTIN,LOW);
   //delay(500);
-  holdingRegs[EXEC_TIME] = micros() - starttime;
 }
 
 // Display print wrapper
@@ -2441,10 +2444,12 @@ void timer500us_isr(void)
   //if (lastPressTimeout) {lastPressTimeout--;}
   if (!digitalReadFast(MOTOR_CLK))
     hourTimeout--; // every 1ms
+
   if (refreshMenuTimeout)
   {
     refreshMenuTimeout--;
   }
+
   if (laserTimeout)
   {
     laserTimeout--;
@@ -2453,6 +2458,7 @@ void timer500us_isr(void)
   {
     digitalWrite(LASER, LOW);
   }
+
   if (testTimeout)
   {
     testTimeout--;
@@ -2461,6 +2467,7 @@ void timer500us_isr(void)
   {
     intTest = false;
   }
+
   if (menuTimeout)
   {
     menuTimeout--;
@@ -2472,6 +2479,7 @@ void timer500us_isr(void)
       loggedIn = false;
     }
   }
+
   //buttons timeouts
   if (BtnPressedATimeout)
   {
@@ -2512,7 +2520,7 @@ void timer500us_isr(void)
 void motor_isr(void)
 {
   motorPulseIndex++;
-
+  analogBufferIndex = positionOffset * 2; // from % to 0-200
   if (motorPulseIndex > 5)
   { // one time per turn
     motorTimeOld = motorTimeNow;
@@ -2520,8 +2528,6 @@ void motor_isr(void)
     motorTimeDiff = motorTimeNow - motorTimeOld; // time of one rotation = 6000us
     motorPulseIndex = 0;
   } // one time per turn
-
-  analogBufferIndex = positionOffset * 2; // from % to 0-200
 }
 
 //*****************************************************************
@@ -2529,7 +2535,7 @@ void motor_isr(void)
 // called everytime a new value is converted. The DMA isr is called first
 void adc0_isr(void)
 {
-  // digitalWriteFast(LED_POWER, HIGH); //debug
+  //digitalWriteFast(LED_POWER, !digitalReadFast(LED_POWER)); //debug
 
   adc0Value = adc->adc0->readSingle();
 
@@ -2586,16 +2592,26 @@ void adc0_isr(void)
 
   adc0_buffer[analogBufferIndex] = adc0Value;
   //increment buffer index
-  if (analogBufferIndex < ANALOG_BUFFER_SIZE - 1)
+  if (analogBufferIndex < ANALOG_BUFFER_SIZE - 10)   // need's some time for calculations of results 
   { // some delay for update results
     analogBufferIndex++;
   }
   else
   {
+    //adc->disableInterrupts(ADC_0);
+    adc->adc0->stopPDB();
+    unsigned int now = micros();
+    holdingRegs[EXEC_TIME] = now - exectime;
+    exectime = now;
+
     // update outputs
     updateResults();
-
-    analogBufferIndex = 0;
+    adc->enablePGA(pga,ADC_0);
+    
+    //adc->enableInterrupts(ADC_0);
+    //adc->analogReadDifferential(A10, A11, ADC_0);             //start ADC_0 differential
+    adc->adc0->startPDB(freq); //frequency in Hz
+    analogBufferIndex = 10;    // need's some time for calculations of results & to be symetric
   }
 
   // digitalWriteFast(LED_POWER, LOW);  //debug
@@ -2603,9 +2619,6 @@ void adc0_isr(void)
 
 void updateResults()
 {
-
-  adc->disableInterrupts(ADC_0);
-
   // check SIGNAL PRESENT
   if (peakValue < thre256 - hmdThresholdHyst)
   {
@@ -2703,9 +2716,6 @@ void updateResults()
   risingEdgeTime = 0;
   peakValueTime = 0;
   fallingEdgeTime = 0;
-
-  adc->enablePGA(pga); // update PGA
-  adc->enableInterrupts(ADC_0);
 }
 
 // exponential moving average
@@ -2978,4 +2988,9 @@ void checkModbus()
       intTest = false;
     }
   }
+}
+
+// pdb interrupt is enabled in case you need it.
+void pdb_isr(void) {
+        PDB0_SC &=~PDB_SC_PDBIF; // clear interrupt
 }

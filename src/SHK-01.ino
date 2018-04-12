@@ -195,7 +195,7 @@ volatile int currentMenuOption = 0;
 
 // configure ADC
 
-#define ADC0_AVERAGING 1
+#define ADC0_AVERAGING 4
 #define ANALOG_BUFFER_SIZE 200
 unsigned int freq = 200000;
 
@@ -290,9 +290,9 @@ enum
   POSITION_VALUE,
   POSITION_VALUE_AVG,
 
-  AN_VALUES, // 25 registers
-  AN_VALUES_END = AN_VALUES + 25,
-  EXEC_TIME,
+  AN_VALUES,                      // 25 registers
+  EXEC_TIME_ADC = AN_VALUES + 25, // exectime of adc conversions
+  EXEC_TIME,                      // exectime of adc conversions + results calculation
   TOTAL_ERRORS,
   // leave this one
   TOTAL_REGS_SIZE
@@ -319,9 +319,8 @@ enum
 
 // Timers
 
-//IntervalTimer falseTimer;   // timer stops randomly if only one is defined
 IntervalTimer timer500us; // timer for motor speed and various timeouts
-//IntervalTimer timerOffset;
+IntervalTimer falseTimer; // timer stops randomly if only one is defined
 
 int startTimerValue0 = 0;
 
@@ -444,12 +443,12 @@ void setup()
 
   // it can be ADC_VERY_LOW_SPEED, ADC_LOW_SPEED, ADC_MED_SPEED, ADC_HIGH_SPEED_16BITS, ADC_HIGH_SPEED or ADC_VERY_HIGH_SPEED
   // see the documentation for more information
-  adc->setConversionSpeed(ADC_CONVERSION_SPEED::VERY_HIGH_SPEED,ADC_0); // change the conversion speed
+  adc->setConversionSpeed(ADC_CONVERSION_SPEED::VERY_HIGH_SPEED, ADC_0); // change the conversion speed
   // it can be ADC_VERY_LOW_SPEED, ADC_LOW_SPEED, ADC_MED_SPEED, ADC_HIGH_SPEED or ADC_VERY_HIGH_SPEED
-  adc->setSamplingSpeed(ADC_SAMPLING_SPEED::VERY_HIGH_SPEED,ADC_0); // change the sampling speed
+  adc->setSamplingSpeed(ADC_SAMPLING_SPEED::VERY_HIGH_SPEED, ADC_0); // change the sampling speed
   //adc->setReference(ADC_REF_3V3, ADC_0);
 
-  adc->enablePGA(pga,ADC_0);
+  adc->enablePGA(pga, ADC_0);
 
   // ADC1 for internal temperature measurement
 
@@ -459,11 +458,11 @@ void setup()
   adc->setSamplingSpeed(ADC_SAMPLING_SPEED::VERY_LOW_SPEED, ADC_1);     // change the sampling speed
 
   // read once for setup everything
-  //adc->analogReadDifferential(A10, A11, ADC_0);             //start ADC_0 differential
+  adc->analogReadDifferential(A10, A11, ADC_0);             //start ADC_0 differential
   adc->analogRead(ADC_INTERNAL_SOURCE::TEMP_SENSOR, ADC_1); //start ADC_1 single, temp sensor internal pin 38
 
   // adc->enableInterrupts(ADC_0);
-  //adc->startContinuousDifferential(A10, A11, ADC_0);
+  adc->startContinuousDifferential(A10, A11, ADC_0);
   adc->startContinuous(38, ADC_1); // do not want to accept ADC_INTERNAL_SOURCE::TEMP_SENSOR
 
   //motor configuration and startup
@@ -495,10 +494,10 @@ void setup()
 
   // when motor is running, enable ADC0 interrupts
   adc->enableInterrupts(ADC_0);
-  adc->analogReadDifferential(A10, A11, ADC_0);             //start ADC_0 differential
-  adc->adc0->stopPDB();
-  //NVIC_ENABLE_IRQ(IRQ_PDB); // enable interrupts
-  adc->adc0->startPDB(freq); //frequency in Hz
+  // adc->analogReadDifferential(A10, A11, ADC_0);             //start ADC_0 differential
+  // adc->adc0->stopPDB();
+  // //NVIC_ENABLE_IRQ(IRQ_PDB); // enable interrupts
+  // adc->adc0->startPDB(freq); //frequency in Hz
 }
 
 void loop()
@@ -2443,7 +2442,9 @@ void timer500us_isr(void)
   //if (lastSentTimeout) {lastSentTimeout--;}
   //if (lastPressTimeout) {lastPressTimeout--;}
   if (!digitalReadFast(MOTOR_CLK))
+  {
     hourTimeout--; // every 1ms
+  }
 
   if (refreshMenuTimeout)
   {
@@ -2521,6 +2522,7 @@ void motor_isr(void)
 {
   motorPulseIndex++;
   analogBufferIndex = positionOffset * 2; // from % to 0-200
+
   if (motorPulseIndex > 5)
   { // one time per turn
     motorTimeOld = motorTimeNow;
@@ -2583,7 +2585,7 @@ void adc0_isr(void)
       )
       {
         fallingEdgeTime = ((micros() - motorTimeNow + (positionOffset * 10)) % 1000); // range per mirror 0-1000 us
-                                                                                      //fallingEdgeTime = analogBufferIndex*5;
+        //fallingEdgeTime = analogBufferIndex*5;
       }
 
       peak[analogBufferIndex] = peakValue;
@@ -2591,27 +2593,32 @@ void adc0_isr(void)
   }
 
   adc0_buffer[analogBufferIndex] = adc0Value;
+
   //increment buffer index
-  if (analogBufferIndex < ANALOG_BUFFER_SIZE - 10)   // need's some time for calculations of results 
+  if (analogBufferIndex < ANALOG_BUFFER_SIZE - 1)
   { // some delay for update results
     analogBufferIndex++;
   }
   else
   {
-    //adc->disableInterrupts(ADC_0);
-    adc->adc0->stopPDB();
-    unsigned int now = micros();
-    holdingRegs[EXEC_TIME] = now - exectime;
-    exectime = now;
+    adc->disableInterrupts(ADC_0);
+    //adc->adc0->stopPDB();
+
+    holdingRegs[EXEC_TIME_ADC] = micros() - exectime; // exectime of adc conversions
 
     // update outputs
     updateResults();
-    adc->enablePGA(pga,ADC_0);
-    
-    //adc->enableInterrupts(ADC_0);
-    //adc->analogReadDifferential(A10, A11, ADC_0);             //start ADC_0 differential
-    adc->adc0->startPDB(freq); //frequency in Hz
-    analogBufferIndex = 10;    // need's some time for calculations of results & to be symetric
+
+    // update PGA
+    adc->enablePGA(pga, ADC_0);
+
+    holdingRegs[EXEC_TIME] = micros() - exectime; // exectime of adc conversions + results calculation
+
+    adc->enableInterrupts(ADC_0);
+    //adc->adc0->startPDB(freq); //frequency in Hz
+    analogBufferIndex = 0;
+
+    exectime = micros();
   }
 
   // digitalWriteFast(LED_POWER, LOW);  //debug
@@ -2792,7 +2799,7 @@ void checkModbus()
 
   if (!dataSent)
   {
-    for (byte i = 0; i < (AN_VALUES_END - AN_VALUES); i++)
+    for (byte i = 0; i < (EXEC_TIME_ADC - AN_VALUES); i++)     // EXEC_TIME_ADC = AN_VALUES + 25
     {
       //holdingRegs[i+AN_VALUES] = value_buffer[i*8];
       holdingRegs[i + AN_VALUES] = value_buffer[i * 8 + 4] << 8 | value_buffer[i * 8]; // MSB = value_buffer[i*8+4] , LSB = value_buffer[i*8] ; only 50 of 200
@@ -2991,6 +2998,6 @@ void checkModbus()
 }
 
 // pdb interrupt is enabled in case you need it.
-void pdb_isr(void) {
-        PDB0_SC &=~PDB_SC_PDBIF; // clear interrupt
-}
+// void pdb_isr(void) {
+//         PDB0_SC &=~PDB_SC_PDBIF; // clear interrupt
+// }

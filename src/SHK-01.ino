@@ -2707,8 +2707,9 @@ void updateResults()
     break;
   }
 
-  if (dataSent && motorPulseIndex == 0)
-  { // prepare data for visualization on PC, only one mirror
+  //if (dataSent && motorPulseIndex == 0) // prepare data for visualization on PC, only first mirror
+  if (dataSent && motorPulseIndex == (filterPosition % 6))   // possibility to view different mirrors by changing positionFilter
+  { 
     for (int i = 0; i < ANALOG_BUFFER_SIZE; i++)
     {
       value_buffer[i] = adc0_buffer[i];

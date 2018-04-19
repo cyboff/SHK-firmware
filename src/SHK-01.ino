@@ -320,7 +320,6 @@ enum
 // Timers
 
 IntervalTimer timer500us; // timer for motor speed and various timeouts
-IntervalTimer falseTimer; // timer stops randomly if only one is defined
 
 int startTimerValue0 = 0;
 
@@ -397,8 +396,8 @@ void setup()
   myDisplay.begin();
   // set the brightness of the display:
   myDisplay.setBrightness(brightness);
-  //  myDisplay.home();
-  //  myDisplay.print("Starting");
+
+  // use wrapper for myDisplay.print
   displayPrint("Starting");
   delay(500);
 
@@ -494,10 +493,6 @@ void setup()
 
   // when motor is running, enable ADC0 interrupts
   adc->enableInterrupts(ADC_0);
-  // adc->analogReadDifferential(A10, A11, ADC_0);             //start ADC_0 differential
-  // adc->adc0->stopPDB();
-  // //NVIC_ENABLE_IRQ(IRQ_PDB); // enable interrupts
-  // adc->adc0->startPDB(freq); //frequency in Hz
 }
 
 void loop()
@@ -2997,8 +2992,3 @@ void checkModbus()
     }
   }
 }
-
-// pdb interrupt is enabled in case you need it.
-// void pdb_isr(void) {
-//         PDB0_SC &=~PDB_SC_PDBIF; // clear interrupt
-// }

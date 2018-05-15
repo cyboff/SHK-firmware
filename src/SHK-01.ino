@@ -578,8 +578,11 @@ void displayMenu(void)
       {
         lastKey = BTN_BH;
       }
+      if ((currentMenu != MENU_MODBUS_ID) || BtnReleasedB)
+      {
       resultButtonA = STATE_NORMAL;
       resultButtonB = STATE_NORMAL;
+      }
       break;
     default:
       break;
@@ -1308,27 +1311,16 @@ void setModbusID(void)
 
   if (lastKey == BTN_BH)
   { // increment by 1 or 10
-    if (incID == 1)
-    {
-      incID = 10;
-      displayPrint("ID   x10");
-      delay(500);
-    }
-    else
-    {
-      incID = 1;
-      displayPrint("ID    x1");
-      delay(500);
-    }
+    menu_modbusID = menu_modbusID + 10;
   }
 
   if (lastKey == BTN_A)
   { // decrement
-    menu_modbusID = menu_modbusID - incID;
+    menu_modbusID--;
   }
   if (lastKey == BTN_B)
   { // increment
-    menu_modbusID = menu_modbusID + incID;
+    menu_modbusID++;
   }
 
   // check valid Modbus Slave ID range 1..247
@@ -2401,7 +2393,7 @@ void checkButtonA()
 {
   if (digitalReadFast(PIN_BTN_A))
   {
-    if (BtnPressedATimeout)
+    if (BtnPressedATimeout  || resultButtonA == STATE_LONG)
       BtnReleasedA = true;
   }
   else
@@ -2416,7 +2408,7 @@ void checkButtonB()
 {
   if (digitalReadFast(PIN_BTN_B))
   {
-    if (BtnPressedBTimeout)
+    if (BtnPressedBTimeout || resultButtonB == STATE_LONG)
       BtnReleasedB = true;
   }
   else

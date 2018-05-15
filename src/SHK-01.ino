@@ -348,8 +348,8 @@ volatile int resultButtonA = STATE_NORMAL; // global value set by checkButton()
 volatile int resultButtonB = STATE_NORMAL; // global value set by checkButton()
 volatile int BtnPressedATimeout = 0;
 volatile int BtnPressedBTimeout = 0;
-volatile boolean BtnReleasedA = false;
-volatile boolean BtnReleasedB = false;
+volatile boolean BtnReleasedA = true;
+volatile boolean BtnReleasedB = true;
 
 //menu login
 int passwd = 0; // correct passwd is 1122
@@ -569,20 +569,23 @@ void displayMenu(void)
       if (resultButtonA == STATE_LONG && resultButtonB == STATE_LONG)
       {
         lastKey = BTN_ABH;
+        resultButtonA = STATE_NORMAL;
+        resultButtonB = STATE_NORMAL;
       }
       else if (resultButtonB != STATE_LONG)
       {
         lastKey = BTN_AH;
+        resultButtonA = STATE_NORMAL;
       }
       else
       {
         lastKey = BTN_BH;
+        if ((currentMenu != MENU_MODBUS_ID) || BtnReleasedB) // to increment ID while button is hold
+        {
+          resultButtonB = STATE_NORMAL;
+        }
       }
-      if ((currentMenu != MENU_MODBUS_ID) || BtnReleasedB)
-      {
-      resultButtonA = STATE_NORMAL;
-      resultButtonB = STATE_NORMAL;
-      }
+
       break;
     default:
       break;
@@ -1310,7 +1313,7 @@ void setModbusID(void)
     displayPrint("     %3d", menu_modbusID);
 
   if (lastKey == BTN_BH)
-  { // increment by 1 or 10
+  { // hold to increment by 10
     menu_modbusID = menu_modbusID + 10;
   }
 
@@ -2393,7 +2396,7 @@ void checkButtonA()
 {
   if (digitalReadFast(PIN_BTN_A))
   {
-    if (BtnPressedATimeout  || resultButtonA == STATE_LONG)
+    if (BtnPressedATimeout || resultButtonA == STATE_LONG)
       BtnReleasedA = true;
   }
   else
@@ -2476,13 +2479,13 @@ void timer500us_isr(void)
     {
       resultButtonA = STATE_LONG;
       BtnPressedATimeout = 0;
-      BtnReleasedA = false;
+      //BtnReleasedA = false;
     }
     if (BtnReleasedA && (BtnPressedATimeout < (BTN_HOLD_TIME - BTN_DEBOUNCE_TIME)))
     {
       resultButtonA = STATE_SHORT;
       BtnPressedATimeout = 0;
-      BtnReleasedA = false;
+      //BtnReleasedA = false;
     }
   }
 
@@ -2493,13 +2496,13 @@ void timer500us_isr(void)
     {
       resultButtonB = STATE_LONG;
       BtnPressedBTimeout = 0;
-      BtnReleasedB = false;
+      //BtnReleasedB = false;
     }
     if (BtnReleasedB && (BtnPressedBTimeout < (BTN_HOLD_TIME - BTN_DEBOUNCE_TIME)))
     {
       resultButtonB = STATE_SHORT;
       BtnPressedBTimeout = 0;
-      BtnReleasedB = false;
+      //BtnReleasedB = false;
     }
   }
 }
@@ -2695,8 +2698,8 @@ void updateResults()
   }
 
   //if (dataSent && motorPulseIndex == 0) // prepare data for visualization on PC, only first mirror
-  if (dataSent && motorPulseIndex == (filterPosition % 6))   // possibility to view different mirrors by changing positionFilter
-  { 
+  if (dataSent && motorPulseIndex == (filterPosition % 6)) // possibility to view different mirrors by changing positionFilter
+  {
     for (int i = 0; i < ANALOG_BUFFER_SIZE; i++)
     {
       value_buffer[i] = adc0_buffer[i];
@@ -2787,7 +2790,7 @@ void checkModbus()
 
   if (!dataSent)
   {
-    for (byte i = 0; i < (EXEC_TIME_ADC - AN_VALUES); i++)     // EXEC_TIME_ADC = AN_VALUES + 25
+    for (byte i = 0; i < (EXEC_TIME_ADC - AN_VALUES); i++) // EXEC_TIME_ADC = AN_VALUES + 25
     {
       //holdingRegs[i+AN_VALUES] = value_buffer[i*8];
       holdingRegs[i + AN_VALUES] = value_buffer[i * 8 + 4] << 8 | value_buffer[i * 8]; // MSB = value_buffer[i*8+4] , LSB = value_buffer[i*8] ; only 50 of 200

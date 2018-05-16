@@ -192,6 +192,7 @@ volatile boolean extTest = false;
 volatile boolean intTest = false;
 volatile int currentMenu = MENU_MAIN;
 volatile int currentMenuOption = 0;
+volatile int btnHoldCounter = 0;
 
 // configure ADC
 
@@ -231,7 +232,6 @@ int menu_set;
 
 int modbusID = 1;
 int menu_modbusID = 1;
-int incID = 1;
 
 const uint16_t modbusSpeedArray[] = {12, 48, 96, 192, 384, 576, 1152}; // baudrate/100
 int actualSpeed = 3;                                                   // array index
@@ -580,9 +580,11 @@ void displayMenu(void)
       else
       {
         lastKey = BTN_BH;
-        if ((currentMenu != MENU_MODBUS_ID) || BtnReleasedB) // to increment ID while button is hold
+        btnHoldCounter++;
+        if (BtnReleasedB || ((currentMenu != MENU_MODBUS_ID) && (currentMenu != MENU_FILTER_POSITION) && (currentMenu != MENU_FILTER_ON) && (currentMenu != MENU_FILTER_OFF))) // to increment ID while button is hold
         {
           resultButtonB = STATE_NORMAL;
+          btnHoldCounter = 0;
         }
       }
 
@@ -1314,7 +1316,7 @@ void setModbusID(void)
 
   if (lastKey == BTN_BH)
   { // hold to increment by 10
-    menu_modbusID = menu_modbusID + 10;
+      menu_modbusID = menu_modbusID + 10;
   }
 
   if (lastKey == BTN_A)
@@ -1336,7 +1338,6 @@ void setModbusID(void)
   { // ESC
     currentMenu = MENU_MODBUS;
     currentMenuOption = 0;
-    incID = 1;
   }
   if (lastKey == BTN_ABH)
   { // SAVE
@@ -1352,7 +1353,6 @@ void setModbusID(void)
     delay(500);
     currentMenu = MENU_MODBUS;
     currentMenuOption = 0;
-    //incID = 1;
   }
 }
 
@@ -1521,33 +1521,23 @@ void setFilterPosition(void)
 
   if (lastKey == BTN_BH)
   { // increment by 1,10,100
-    switch (incID)
+    if (btnHoldCounter < 20)
     {
-    case 1:
-      incID = 10;
-      displayPrint("fPos x10");
-      delay(500);
-      break;
-    case 10:
-      incID = 100;
-      displayPrint("fPosx100");
-      delay(500);
-      break;
-    case 100:
-      incID = 1;
-      displayPrint("fPos  x1");
-      delay(500);
-      break;
+      menu_filterPosition = menu_filterPosition + 10;
+    }
+    else
+    {
+      menu_filterPosition = menu_filterPosition + 500;
     }
   }
 
   if (lastKey == BTN_A)
   { // decrement
-    menu_filterPosition = menu_filterPosition - incID;
+    menu_filterPosition--;
   }
   if (lastKey == BTN_B)
   { // increment
-    menu_filterPosition = menu_filterPosition + incID;
+    menu_filterPosition++;
   }
 
   //check range in ms
@@ -1560,7 +1550,6 @@ void setFilterPosition(void)
   { // ESC
     currentMenu = MENU_FILTERS;
     currentMenuOption = 0;
-    incID = 1;
   }
   if (lastKey == BTN_ABH)
   { // SAVE
@@ -1570,7 +1559,6 @@ void setFilterPosition(void)
     delay(500);
     currentMenu = MENU_FILTERS;
     currentMenuOption = 0;
-    //incID = 1;
   }
 }
 
@@ -1586,33 +1574,23 @@ void setFilterOn(void)
 
   if (lastKey == BTN_BH)
   { // increment by 1,10,100
-    switch (incID)
+    if (btnHoldCounter < 20)
     {
-    case 1:
-      incID = 10;
-      displayPrint("fOn  x10");
-      delay(500);
-      break;
-    case 10:
-      incID = 100;
-      displayPrint("fOn x100");
-      delay(500);
-      break;
-    case 100:
-      incID = 1;
-      displayPrint("fOn   x1");
-      delay(500);
-      break;
+      menu_filterOn = menu_filterOn + 10;
+    }
+    else
+    {
+      menu_filterOn = menu_filterOn + 100;
     }
   }
 
   if (lastKey == BTN_A)
   { // decrement
-    menu_filterOn = menu_filterOn - incID;
+    menu_filterOn--;
   }
   if (lastKey == BTN_B)
   { // increment
-    menu_filterOn = menu_filterOn + incID;
+    menu_filterOn++;
   }
 
   //check range in ms
@@ -1625,7 +1603,6 @@ void setFilterOn(void)
   { // ESC
     currentMenu = MENU_FILTERS;
     currentMenuOption = 1;
-    incID = 1;
   }
   if (lastKey == BTN_ABH)
   { // SAVE
@@ -1635,7 +1612,6 @@ void setFilterOn(void)
     delay(500);
     currentMenu = MENU_FILTERS;
     currentMenuOption = 1;
-    incID = 1;
   }
 }
 
@@ -1651,33 +1627,23 @@ void setFilterOff(void)
 
   if (lastKey == BTN_BH)
   { // increment by 1,10,100
-    switch (incID)
+    if (btnHoldCounter < 20)
     {
-    case 1:
-      incID = 10;
-      displayPrint("fOff x10");
-      delay(500);
-      break;
-    case 10:
-      incID = 100;
-      displayPrint("fOffx100");
-      delay(500);
-      break;
-    case 100:
-      incID = 1;
-      displayPrint("fOff  x1");
-      delay(500);
-      break;
+      menu_filterOff = menu_filterOff + 10;
+    }
+    else
+    {
+      menu_filterOff = menu_filterOff + 100;
     }
   }
 
   if (lastKey == BTN_A)
   { // decrement
-    menu_filterOff = menu_filterOff - incID;
+    menu_filterOff--;
   }
   if (lastKey == BTN_B)
   { // increment
-    menu_filterOff = menu_filterOff + incID;
+    menu_filterOff++;
   }
 
   //check range in ms
@@ -1690,7 +1656,6 @@ void setFilterOff(void)
   { // ESC
     currentMenu = MENU_FILTERS;
     currentMenuOption = 2;
-    incID = 1;
   }
   if (lastKey == BTN_ABH)
   { // SAVE
@@ -1700,7 +1665,6 @@ void setFilterOff(void)
     delay(500);
     currentMenu = MENU_FILTERS;
     currentMenuOption = 2;
-    incID = 1;
   }
 }
 
@@ -1815,7 +1779,6 @@ void setWindowBegin(void)
     delay(500);
     currentMenu = MENU_ANALOG;
     currentMenuOption = 0;
-    //incID = 1;
   }
 }
 
@@ -2479,13 +2442,11 @@ void timer500us_isr(void)
     {
       resultButtonA = STATE_LONG;
       BtnPressedATimeout = 0;
-      //BtnReleasedA = false;
     }
     if (BtnReleasedA && (BtnPressedATimeout < (BTN_HOLD_TIME - BTN_DEBOUNCE_TIME)))
     {
       resultButtonA = STATE_SHORT;
       BtnPressedATimeout = 0;
-      //BtnReleasedA = false;
     }
   }
 
@@ -2496,13 +2457,11 @@ void timer500us_isr(void)
     {
       resultButtonB = STATE_LONG;
       BtnPressedBTimeout = 0;
-      //BtnReleasedB = false;
     }
     if (BtnReleasedB && (BtnPressedBTimeout < (BTN_HOLD_TIME - BTN_DEBOUNCE_TIME)))
     {
       resultButtonB = STATE_SHORT;
       BtnPressedBTimeout = 0;
-      //BtnReleasedB = false;
     }
   }
 }

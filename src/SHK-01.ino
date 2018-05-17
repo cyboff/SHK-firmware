@@ -193,6 +193,7 @@ volatile boolean intTest = false;
 volatile int currentMenu = MENU_MAIN;
 volatile int currentMenuOption = 0;
 volatile int btnHoldCounter = 0;
+volatile int btnNoneCounter = 0;
 
 // configure ADC
 
@@ -575,13 +576,18 @@ void displayMenu(void)
       else if (resultButtonB != STATE_LONG)
       {
         lastKey = BTN_AH;
-        resultButtonA = STATE_NORMAL;
+        btnHoldCounter++;
+        if (BtnReleasedA || ((currentMenu != MENU_MODBUS_ID) && (currentMenu != MENU_POSITION_OFFSET) && (currentMenu != MENU_FILTER_POSITION) && (currentMenu != MENU_FILTER_ON) && (currentMenu != MENU_FILTER_OFF))) // to increment ID while button is hold
+        {
+          resultButtonA = STATE_NORMAL;
+          btnHoldCounter = 0;
+        }
       }
       else
       {
         lastKey = BTN_BH;
         btnHoldCounter++;
-        if (BtnReleasedB || ((currentMenu != MENU_MODBUS_ID) && (currentMenu != MENU_FILTER_POSITION) && (currentMenu != MENU_FILTER_ON) && (currentMenu != MENU_FILTER_OFF))) // to increment ID while button is hold
+        if (BtnReleasedB || ((currentMenu != MENU_MODBUS_ID) && (currentMenu != MENU_POSITION_OFFSET) && (currentMenu != MENU_FILTER_POSITION) && (currentMenu != MENU_FILTER_ON) && (currentMenu != MENU_FILTER_OFF))) // to increment ID while button is hold
         {
           resultButtonB = STATE_NORMAL;
           btnHoldCounter = 0;
@@ -1047,11 +1053,22 @@ void setGain1Menu(void)
     else
       menu_pga = 1;
   }
-  if (lastKey == BTN_AH)
+
+  if (lastKey == BTN_NONE)
   { // ESC
-    currentMenu = MENU_SENSOR;
-    currentMenuOption = 0;
+    btnNoneCounter++;
+    if (btnNoneCounter > 100)
+    {
+      currentMenu = MENU_SENSOR;
+      currentMenuOption = 0;
+      btnNoneCounter = 0;
+    }
   }
+  else
+  {
+    btnNoneCounter = 0;
+  }
+
   if (lastKey == BTN_ABH)
   { //SAVE
     pga1 = menu_pga;
@@ -1076,22 +1093,33 @@ void setThre1Menu(void)
   if (lastKey == BTN_A)
   {
     if (menu_thre > 20)
-      menu_thre = menu_thre - 10;
+      menu_thre = menu_thre - 5;
     else
       menu_thre = 80;
   }
   if (lastKey == BTN_B)
   {
     if (menu_thre < 80)
-      menu_thre = menu_thre + 10;
+      menu_thre = menu_thre + 5;
     else
       menu_thre = 20;
   }
-  if (lastKey == BTN_AH)
+
+  if (lastKey == BTN_NONE)
   { // ESC
-    currentMenu = MENU_SENSOR;
-    currentMenuOption = 1;
+    btnNoneCounter++;
+    if (btnNoneCounter > 100)
+    {
+      currentMenu = MENU_SENSOR;
+      currentMenuOption = 1;
+      btnNoneCounter = 0;
+    }
   }
+  else
+  {
+    btnNoneCounter = 0;
+  }
+
   if (lastKey == BTN_ABH)
   { // SAVE
     thre1 = menu_thre;
@@ -1127,11 +1155,22 @@ void setGain2Menu(void)
     else
       menu_pga = 1;
   }
-  if (lastKey == BTN_AH)
+
+  if (lastKey == BTN_NONE)
   { // ESC
-    currentMenu = MENU_SENSOR;
-    currentMenuOption = 2;
+    btnNoneCounter++;
+    if (btnNoneCounter > 100)
+    {
+      currentMenu = MENU_SENSOR;
+      currentMenuOption = 2;
+      btnNoneCounter = 0;
+    }
   }
+  else
+  {
+    btnNoneCounter = 0;
+  }
+
   if (lastKey == BTN_ABH)
   { //SAVE
     pga2 = menu_pga;
@@ -1156,22 +1195,33 @@ void setThre2Menu(void)
   if (lastKey == BTN_A)
   {
     if (menu_thre > 20)
-      menu_thre = menu_thre - 10;
+      menu_thre = menu_thre - 5;
     else
       menu_thre = 80;
   }
   if (lastKey == BTN_B)
   {
     if (menu_thre < 80)
-      menu_thre = menu_thre + 10;
+      menu_thre = menu_thre + 5;
     else
       menu_thre = 20;
   }
-  if (lastKey == BTN_AH)
+
+  if (lastKey == BTN_NONE)
   { // ESC
-    currentMenu = MENU_SENSOR;
-    currentMenuOption = 3;
+    btnNoneCounter++;
+    if (btnNoneCounter > 100)
+    {
+      currentMenu = MENU_SENSOR;
+      currentMenuOption = 3;
+      btnNoneCounter = 0;
+    }
   }
+  else
+  {
+    btnNoneCounter = 0;
+  }
+
   if (lastKey == BTN_ABH)
   { // SAVE
     thre2 = menu_thre;
@@ -1222,11 +1272,22 @@ void setSetMenu(void)
     else
       menu_set = 0;
   }
-  if (lastKey == BTN_AH)
+
+  if (lastKey == BTN_NONE)
   { // ESC
-    currentMenu = MENU_SENSOR;
-    currentMenuOption = 4;
+    btnNoneCounter++;
+    if (btnNoneCounter > 100)
+    {
+      currentMenu = MENU_SENSOR;
+      currentMenuOption = 4;
+      btnNoneCounter = 0;
+    }
   }
+  else
+  {
+    btnNoneCounter = 0;
+  }
+
   if (lastKey == BTN_ABH)
   { // SAVE
     set = menu_set;
@@ -1314,9 +1375,14 @@ void setModbusID(void)
   else
     displayPrint("     %3d", menu_modbusID);
 
+  if (lastKey == BTN_AH)
+  { // hold to increment by 10
+    menu_modbusID = menu_modbusID - 10;
+  }
+
   if (lastKey == BTN_BH)
   { // hold to increment by 10
-      menu_modbusID = menu_modbusID + 10;
+    menu_modbusID = menu_modbusID + 10;
   }
 
   if (lastKey == BTN_A)
@@ -1334,11 +1400,21 @@ void setModbusID(void)
   if (menu_modbusID > 247)
     menu_modbusID = 1;
 
-  if (lastKey == BTN_AH)
+  if (lastKey == BTN_NONE)
   { // ESC
-    currentMenu = MENU_MODBUS;
-    currentMenuOption = 0;
+    btnNoneCounter++;
+    if (btnNoneCounter > 100)
+    {
+      currentMenu = MENU_MODBUS;
+      currentMenuOption = 0;
+      btnNoneCounter = 0;
+    }
   }
+  else
+  {
+    btnNoneCounter = 0;
+  }
+
   if (lastKey == BTN_ABH)
   { // SAVE
     modbusID = menu_modbusID;
@@ -1382,11 +1458,22 @@ void setModbusSpeed(void)
       actualSpeed = 0;
     menu_modbusSpeed = modbusSpeedArray[actualSpeed] * 100;
   }
-  if (lastKey == BTN_AH)
+
+  if (lastKey == BTN_NONE)
   { // ESC
-    currentMenu = MENU_MODBUS;
-    currentMenuOption = 1;
+    btnNoneCounter++;
+    if (btnNoneCounter > 100)
+    {
+      currentMenu = MENU_MODBUS;
+      currentMenuOption = 1;
+      btnNoneCounter = 0;
+    }
   }
+  else
+  {
+    btnNoneCounter = 0;
+  }
+
   if (lastKey == BTN_ABH)
   { // SAVE
     modbusSpeed = menu_modbusSpeed;
@@ -1430,10 +1517,20 @@ void setModbusFormat(void)
       actualFormat = 0;
     menu_modbusFormat = modbusFormatArray[actualFormat];
   }
-  if (lastKey == BTN_AH)
+
+  if (lastKey == BTN_NONE)
   { // ESC
-    currentMenu = MENU_MODBUS;
-    currentMenuOption = 2;
+    btnNoneCounter++;
+    if (btnNoneCounter > 100)
+    {
+      currentMenu = MENU_MODBUS;
+      currentMenuOption = 2;
+      btnNoneCounter = 0;
+    }
+  }
+  else
+  {
+    btnNoneCounter = 0;
   }
 
   if (lastKey == BTN_ABH)
@@ -1519,6 +1616,18 @@ void setFilterPosition(void)
   else
     displayPrint("    %4d", menu_filterPosition);
 
+  if (lastKey == BTN_AH)
+  { // decrement by 1,10,100
+    if (btnHoldCounter < 20)
+    {
+      menu_filterPosition = menu_filterPosition - 10;
+    }
+    else
+    {
+      menu_filterPosition = menu_filterPosition - 100;
+    }
+  }
+
   if (lastKey == BTN_BH)
   { // increment by 1,10,100
     if (btnHoldCounter < 20)
@@ -1527,7 +1636,7 @@ void setFilterPosition(void)
     }
     else
     {
-      menu_filterPosition = menu_filterPosition + 500;
+      menu_filterPosition = menu_filterPosition + 100;
     }
   }
 
@@ -1546,11 +1655,21 @@ void setFilterPosition(void)
   if (menu_filterPosition > 9999)
     menu_filterPosition = 0;
 
-  if (lastKey == BTN_AH)
+  if (lastKey == BTN_NONE)
   { // ESC
-    currentMenu = MENU_FILTERS;
-    currentMenuOption = 0;
+    btnNoneCounter++;
+    if (btnNoneCounter > 100)
+    {
+      currentMenu = MENU_FILTERS;
+      currentMenuOption = 0;
+      btnNoneCounter = 0;
+    }
   }
+  else
+  {
+    btnNoneCounter = 0;
+  }
+
   if (lastKey == BTN_ABH)
   { // SAVE
     filterPosition = menu_filterPosition;
@@ -1571,6 +1690,18 @@ void setFilterOn(void)
     displayPrint("fOn %4d", menu_filterOn);
   else
     displayPrint("    %4d", menu_filterOn);
+
+  if (lastKey == BTN_AH)
+  { // decrement by 1,10,100
+    if (btnHoldCounter < 20)
+    {
+      menu_filterOn = menu_filterOn - 10;
+    }
+    else
+    {
+      menu_filterOn = menu_filterOn - 100;
+    }
+  }
 
   if (lastKey == BTN_BH)
   { // increment by 1,10,100
@@ -1599,11 +1730,21 @@ void setFilterOn(void)
   if (menu_filterOn > 9999)
     menu_filterOn = 0;
 
-  if (lastKey == BTN_AH)
+  if (lastKey == BTN_NONE)
   { // ESC
-    currentMenu = MENU_FILTERS;
-    currentMenuOption = 1;
+    btnNoneCounter++;
+    if (btnNoneCounter > 100)
+    {
+      currentMenu = MENU_FILTERS;
+      currentMenuOption = 1;
+      btnNoneCounter = 0;
+    }
   }
+  else
+  {
+    btnNoneCounter = 0;
+  }
+
   if (lastKey == BTN_ABH)
   { // SAVE
     filterOn = menu_filterOn;
@@ -1624,6 +1765,18 @@ void setFilterOff(void)
     displayPrint("fOff%4d", menu_filterOff);
   else
     displayPrint("    %4d", menu_filterOff);
+
+  if (lastKey == BTN_AH)
+  { // decrement by 1,10,100
+    if (btnHoldCounter < 20)
+    {
+      menu_filterOff = menu_filterOff - 10;
+    }
+    else
+    {
+      menu_filterOff = menu_filterOff - 100;
+    }
+  }
 
   if (lastKey == BTN_BH)
   { // increment by 1,10,100
@@ -1652,11 +1805,21 @@ void setFilterOff(void)
   if (menu_filterOff > 9999)
     menu_filterOff = 0;
 
-  if (lastKey == BTN_AH)
+  if (lastKey == BTN_NONE)
   { // ESC
-    currentMenu = MENU_FILTERS;
-    currentMenuOption = 2;
+    btnNoneCounter++;
+    if (btnNoneCounter > 100)
+    {
+      currentMenu = MENU_FILTERS;
+      currentMenuOption = 2;
+      btnNoneCounter = 0;
+    }
   }
+  else
+  {
+    btnNoneCounter = 0;
+  }
+
   if (lastKey == BTN_ABH)
   { // SAVE
     filterOff = menu_filterOff;
@@ -1766,11 +1929,21 @@ void setWindowBegin(void)
   if (menu_windowBegin > 50)
     menu_windowBegin = 5;
 
-  if (lastKey == BTN_AH)
+  if (lastKey == BTN_NONE)
   { // ESC
-    currentMenu = MENU_ANALOG;
-    currentMenuOption = 0;
+    btnNoneCounter++;
+    if (btnNoneCounter > 100)
+    {
+      currentMenu = MENU_ANALOG;
+      currentMenuOption = 0;
+      btnNoneCounter = 0;
+    }
   }
+  else
+  {
+    btnNoneCounter = 0;
+  }
+
   if (lastKey == BTN_ABH)
   { // SAVE
     windowBegin = menu_windowBegin;
@@ -1807,11 +1980,21 @@ void setWindowEnd(void)
   if (menu_windowEnd > 95)
     menu_windowEnd = 50;
 
-  if (lastKey == BTN_AH)
+  if (lastKey == BTN_NONE)
   { // ESC
-    currentMenu = MENU_ANALOG;
-    currentMenuOption = 1;
+    btnNoneCounter++;
+    if (btnNoneCounter > 100)
+    {
+      currentMenu = MENU_ANALOG;
+      currentMenuOption = 1;
+      btnNoneCounter = 0;
+    }
   }
+  else
+  {
+    btnNoneCounter = 0;
+  }
+
   if (lastKey == BTN_ABH)
   { // SAVE
     windowEnd = menu_windowEnd;
@@ -1849,11 +2032,21 @@ void setPositionMode(void)
       menu_positionMode = 3;
   }
 
-  if (lastKey == BTN_AH)
+  if (lastKey == BTN_NONE)
   { // ESC
-    currentMenu = MENU_ANALOG;
-    currentMenuOption = 2;
+    btnNoneCounter++;
+    if (btnNoneCounter > 100)
+    {
+      currentMenu = MENU_ANALOG;
+      currentMenuOption = 2;
+      btnNoneCounter = 0;
+    }
   }
+  else
+  {
+    btnNoneCounter = 0;
+  }
+
   if (lastKey == BTN_ABH)
   { // SAVE
     positionMode = menu_positionMode;
@@ -1891,11 +2084,21 @@ void setAnalogOutMode(void)
       menu_analogOutMode = 3;
   }
 
-  if (lastKey == BTN_AH)
+  if (lastKey == BTN_NONE)
   { // ESC
-    currentMenu = MENU_ANALOG;
-    currentMenuOption = 3;
+    btnNoneCounter++;
+    if (btnNoneCounter > 100)
+    {
+      currentMenu = MENU_ANALOG;
+      currentMenuOption = 3;
+      btnNoneCounter = 0;
+    }
   }
+  else
+  {
+    btnNoneCounter = 0;
+  }
+
   if (lastKey == BTN_ABH)
   { // SAVE
     analogOutMode = menu_analogOutMode;
@@ -1917,13 +2120,22 @@ void setPositionOffset(void)
   else
     displayPrint("    %3d%%", menu_positionOffset);
 
+  if (lastKey == BTN_AH)
+  { // decrement
+    menu_positionOffset--;
+  }
+  if (lastKey == BTN_BH)
+  { // increment
+    menu_positionOffset++;
+  }
+
   if (lastKey == BTN_A)
   { // decrement
-    menu_positionOffset = menu_positionOffset - 5;
+    menu_positionOffset--;
   }
   if (lastKey == BTN_B)
   { // increment
-    menu_positionOffset = menu_positionOffset + 5;
+    menu_positionOffset++;
   }
 
   //check range, min 5, max 95
@@ -1932,11 +2144,21 @@ void setPositionOffset(void)
   if (menu_positionOffset > 95)
     menu_positionOffset = 5;
 
-  if (lastKey == BTN_AH)
+  if (lastKey == BTN_NONE)
   { // ESC
-    currentMenu = MENU_ANALOG;
-    currentMenuOption = 4;
+    btnNoneCounter++;
+    if (btnNoneCounter > 100)
+    {
+      currentMenu = MENU_ANALOG;
+      currentMenuOption = 4;
+      btnNoneCounter = 0;
+    }
   }
+  else
+  {
+    btnNoneCounter = 0;
+  }
+
   if (lastKey == BTN_ABH)
   { // SAVE
     positionOffset = menu_positionOffset;
@@ -2043,11 +2265,21 @@ void showResetMenu(void)
       currentMenuOption = 1;
   }
 
-  if (lastKey == BTN_AH)
-  {
-    currentMenu = MENU_INFO;
-    currentMenuOption = 5;
+  if (lastKey == BTN_NONE)
+  { // ESC
+    btnNoneCounter++;
+    if (btnNoneCounter > 100)
+    {
+      currentMenu = MENU_INFO;
+      currentMenuOption = 5;
+      btnNoneCounter = 0;
+    }
   }
+  else
+  {
+    btnNoneCounter = 0;
+  }
+
   if (lastKey == BTN_ABH)
   {
     if (currentMenuOption == 0)

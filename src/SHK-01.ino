@@ -202,7 +202,7 @@ volatile int btnNoneCounter = 0;
 unsigned int freq = 200000;
 
 ADC *adc = new ADC();                         // adc object
-volatile int adc0_buffer[ANALOG_BUFFER_SIZE]; // ADC_0 8-bit resolution
+volatile int adc0_buffer[ANALOG_BUFFER_SIZE]; // ADC_0 9-bit resolution for differential - sign + 8 bit
 volatile int peak[ANALOG_BUFFER_SIZE];
 volatile int value_buffer[ANALOG_BUFFER_SIZE];
 //volatile int value_peak[ANALOG_BUFFER_SIZE];
@@ -439,7 +439,7 @@ void setup()
   pinMode(A11, INPUT); // analog input N differential for PGA
 
   adc->setAveraging(ADC0_AVERAGING, ADC_0); // set number of averages
-  adc->setResolution(8, ADC_0);             // set bits of resolution
+  adc->setResolution(9, ADC_0);             // set bits of resolution - 9 bit for differential
 
   // it can be ADC_VERY_LOW_SPEED, ADC_LOW_SPEED, ADC_MED_SPEED, ADC_HIGH_SPEED_16BITS, ADC_HIGH_SPEED or ADC_VERY_HIGH_SPEED
   // see the documentation for more information

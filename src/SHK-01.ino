@@ -21,6 +21,9 @@
 //for ModBus
 #include <SimpleModbusSlave.h>
 
+//for offset delay
+#include <TeensyDelay.h>
+
 //defaults EEPROM
 #define MODEL_TYPE 50
 #define MODEL_SERIAL_NUMBER 18001
@@ -485,6 +488,9 @@ void setup()
     delay(100);
   }
 
+  TeensyDelay::begin();
+  TeensyDelay::addDelayChannel(callback_delay,0); //setup channel 0 
+
   //clear data buffers
   for (int i = 0; i < ANALOG_BUFFER_SIZE; i++)
   {
@@ -493,7 +499,7 @@ void setup()
   }
 
   // when motor is running, enable ADC0 interrupts
-  adc->enableInterrupts(ADC_0);
+  //adc->enableInterrupts(ADC_0);
 }
 
 void loop()
@@ -2702,7 +2708,9 @@ void timer500us_isr(void)
 void motor_isr(void)
 {
   motorPulseIndex++;
-  analogBufferIndex = positionOffset * 2; // from % to 0-200
+  //analogBufferIndex = positionOffset * 2; // from % to 0-200
+  
+
 
   if (motorPulseIndex > 5)
   { // one time per turn
@@ -2710,9 +2718,18 @@ void motor_isr(void)
     motorTimeNow = micros();
     motorTimeDiff = motorTimeNow - motorTimeOld; // time of one rotation = 6000us
     motorPulseIndex = 0;
+    TeensyDelay::trigger(positionOffset*10,0);
   } // one time per turn
 }
 
+void callback_delay()
+{
+    adc->enableInterrupts(ADC_0);
+    //adc->adc0->startPDB(freq); //frequency in Hz
+    analogBufferIndex = 0;
+    //TeensyDelay::trigger(1000,0);
+    exectime = micros();
+}
 //*****************************************************************
 // ADC interrupts
 // called everytime a new value is converted. The DMA isr is called first
@@ -2748,8 +2765,9 @@ void adc0_isr(void)
       // check for rising edge
       if (!risingEdgeTime)
       {                                                                              // only first occurence
-        risingEdgeTime = ((micros() - motorTimeNow + (positionOffset * 10)) % 1000); // range per mirror 0-1000 us
-        //risingEdgeTime = analogBufferIndex * 5;
+        //risingEdgeTime = ((micros() - motorTimeNow) % 1000); // range per mirror 0-1000 us
+        //risingEdgeTime = ((micros() - motorTimeNow + (positionOffset * 10)) % 1000); // range per mirror 0-1000 us
+        risingEdgeTime = analogBufferIndex * 5;
       }
 
       // check for peak (but signal can be unstable)
@@ -2795,11 +2813,11 @@ void adc0_isr(void)
 
     holdingRegs[EXEC_TIME] = micros() - exectime; // exectime of adc conversions + results calculation
 
-    adc->enableInterrupts(ADC_0);
-    //adc->adc0->startPDB(freq); //frequency in Hz
-    analogBufferIndex = 0;
+    // adc->enableInterrupts(ADC_0);
+    // //adc->adc0->startPDB(freq); //frequency in Hz
+    // analogBufferIndex = 0;
 
-    exectime = micros();
+    
   }
 
   // digitalWriteFast(LED_POWER, LOW);  //debug

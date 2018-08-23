@@ -446,7 +446,7 @@ void setup()
   adc->setConversionSpeed(ADC_CONVERSION_SPEED::VERY_HIGH_SPEED, ADC_0); // change the conversion speed
   // it can be ADC_VERY_LOW_SPEED, ADC_LOW_SPEED, ADC_MED_SPEED, ADC_HIGH_SPEED or ADC_VERY_HIGH_SPEED
   adc->setSamplingSpeed(ADC_SAMPLING_SPEED::VERY_HIGH_SPEED, ADC_0); // change the sampling speed
-  //adc->setReference(ADC_REF_3V3, ADC_0);
+  //adc->setReference(ADC_REFERENCE::REF_1V2, ADC_0); // use default 3.3V for input signal > 1.2V 
 
   adc->enablePGA(pga, ADC_0);
 

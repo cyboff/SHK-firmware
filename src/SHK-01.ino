@@ -2891,10 +2891,10 @@ void updateResults()
   //if (dataSent && motorPulseIndex == 0) // prepare data for visualization on PC, only first mirror
   if (dataSent && motorPulseIndex == (filterPosition % 6)) // possibility to view different mirrors by changing positionFilter
   {
-    for (int i = 0; i < ANALOG_BUFFER_SIZE; i++)
+    for (int i = 0; i < (EXEC_TIME_ADC - AN_VALUES); i++) // using only 25 modbus registers for sending data
     {
-      value_buffer[i] = adc0_buffer[i];
-      //value_peak[i] = peak[i];
+      //value_buffer[i] = adc0_buffer[i];
+      value_buffer[i] = adc0_buffer[i * 8 + 4] << 8 | adc0_buffer[i * 8]; // MSB = adc0_buffer[i*8+4] , LSB = adc0_buffer[i*8] ; only 50 of 200
     }
 
     dataSent = false;
@@ -2983,8 +2983,8 @@ void checkModbus()
   {
     for (byte i = 0; i < (EXEC_TIME_ADC - AN_VALUES); i++) // EXEC_TIME_ADC = AN_VALUES + 25
     {
-      //holdingRegs[i+AN_VALUES] = value_buffer[i*8];
-      holdingRegs[i + AN_VALUES] = value_buffer[i * 8 + 4] << 8 | value_buffer[i * 8]; // MSB = value_buffer[i*8+4] , LSB = value_buffer[i*8] ; only 50 of 200
+      holdingRegs[i+AN_VALUES] = value_buffer[i];
+      //holdingRegs[i + AN_VALUES] = value_buffer[i * 8 + 4] << 8 | value_buffer[i * 8]; // MSB = value_buffer[i*8+4] , LSB = value_buffer[i*8] ; only 50 of 200
     }
 
     dataSent = true;

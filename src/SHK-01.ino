@@ -200,14 +200,14 @@ volatile int btnNoneCounter = 0;
 
 // configure ADC
 
-#define ADC0_AVERAGING 4
-#define ANALOG_BUFFER_SIZE 200
+#define ADC0_AVERAGING 1
+#define ANALOG_BUFFER_SIZE 500
 unsigned int freq = 200000;
 
 ADC *adc = new ADC();                         // adc object
 volatile int adc0_buffer[ANALOG_BUFFER_SIZE]; // ADC_0 9-bit resolution for differential - sign + 8 bit
-volatile int peak[ANALOG_BUFFER_SIZE];
-volatile int value_buffer[ANALOG_BUFFER_SIZE];
+//volatile int peak[ANALOG_BUFFER_SIZE];
+volatile int value_buffer[25];
 //volatile int value_peak[ANALOG_BUFFER_SIZE];
 volatile int adc0Value = 0;         //analog value
 volatile int analogBufferIndex = 0; //analog buffer pointer
@@ -495,7 +495,7 @@ void setup()
   for (int i = 0; i < ANALOG_BUFFER_SIZE; i++)
   {
     adc0_buffer[i] = 0;
-    peak[i] = 0;
+    //peak[i] = 0;
   }
 
   // when motor is running, enable ADC0 interrupts
@@ -2709,7 +2709,7 @@ void motor_isr(void)
 {
   motorPulseIndex++;
   //analogBufferIndex = positionOffset * 2; // from % to 0-200
-  
+  TeensyDelay::trigger(positionOffset*5,0);
 
 
   if (motorPulseIndex > 5)
@@ -2718,7 +2718,7 @@ void motor_isr(void)
     motorTimeNow = micros();
     motorTimeDiff = motorTimeNow - motorTimeOld; // time of one rotation = 6000us
     motorPulseIndex = 0;
-    TeensyDelay::trigger(positionOffset*10,0);
+    
   } // one time per turn
 }
 
@@ -2745,51 +2745,51 @@ void adc0_isr(void)
   }
 
   // clear old values
-  adc0_buffer[analogBufferIndex] = 0;
-  peak[analogBufferIndex] = 0;
+  //adc0_buffer[analogBufferIndex] = 0;
+  //peak[analogBufferIndex] = 0;
 
-  //if in measuring window
-  if ((analogBufferIndex > windowBegin * 2) && (analogBufferIndex < windowEnd * 2))
-  { // from % to index of 0-200
+  // //if in measuring window
+  // if ((analogBufferIndex > windowBegin * 2) && (analogBufferIndex < windowEnd * 2))
+  // { // from % to index of 0-200
 
-    // check peak
-    if (adc0Value > peakValue)
-    {
-      peakValue = adc0Value;
-    }
+  //   // check peak
+  //   if (adc0Value > peakValue)
+  //   {
+  //     peakValue = adc0Value;
+  //   }
 
-    // check threshold crossing
-    if ((peakValue > thre256 + hmdThresholdHyst) || (digitalReadFast(LED_SIGNAL) && (peakValue > thre256 - hmdThresholdHyst)))
-    {
+  //   // check threshold crossing
+  //   if ((peakValue > thre256 + hmdThresholdHyst) || (digitalReadFast(LED_SIGNAL) && (peakValue > thre256 - hmdThresholdHyst)))
+  //   {
 
-      // check for rising edge
-      if (!risingEdgeTime)
-      {                                                                              // only first occurence
-        //risingEdgeTime = ((micros() - motorTimeNow) % 1000); // range per mirror 0-1000 us
-        //risingEdgeTime = ((micros() - motorTimeNow + (positionOffset * 10)) % 1000); // range per mirror 0-1000 us
-        risingEdgeTime = analogBufferIndex * 5;
-      }
+  //     // check for rising edge
+  //     if (!risingEdgeTime)
+  //     {                                                                              // only first occurence
+  //       //risingEdgeTime = ((micros() - motorTimeNow) % 1000); // range per mirror 0-1000 us
+  //       //risingEdgeTime = ((micros() - motorTimeNow + (positionOffset * 10)) % 1000); // range per mirror 0-1000 us
+  //       risingEdgeTime = analogBufferIndex * 5;
+  //     }
 
-      // check for peak (but signal can be unstable)
-      if (peak[analogBufferIndex - 1] + 5 < peakValue)
-      {
-        peakValueTime = ((micros() - motorTimeNow + (positionOffset * 10)) % 1000); // range per mirror 0-1000 us
-        //peakValueTime = analogBufferIndex * 5;
-      }
+  //     // check for peak (but signal can be unstable)
+  //     if (peak[analogBufferIndex - 1] + 5 < peakValue)
+  //     {
+  //       peakValueTime = ((micros() - motorTimeNow + (positionOffset * 10)) % 1000); // range per mirror 0-1000 us
+  //       //peakValueTime = analogBufferIndex * 5;
+  //     }
 
-      // check for falling edge
-      if (!fallingEdgeTime                                    // only the first occurence
-          && ((adc0Value < (thre256 - hmdThresholdHyst - 13)) // added additional hysteresis to avoid flickering
-              || (analogBufferIndex == windowEnd * 2 - 1))    // or when real signal falling edge is not in measuring window (first occurence)
-      )
-      {
-        fallingEdgeTime = ((micros() - motorTimeNow + (positionOffset * 10)) % 1000); // range per mirror 0-1000 us
-        //fallingEdgeTime = analogBufferIndex*5;
-      }
+  //     // check for falling edge
+  //     if (!fallingEdgeTime                                    // only the first occurence
+  //         && ((adc0Value < (thre256 - hmdThresholdHyst - 13)) // added additional hysteresis to avoid flickering
+  //             || (analogBufferIndex == windowEnd * 2 - 1))    // or when real signal falling edge is not in measuring window (first occurence)
+  //     )
+  //     {
+  //       fallingEdgeTime = ((micros() - motorTimeNow + (positionOffset * 10)) % 1000); // range per mirror 0-1000 us
+  //       //fallingEdgeTime = analogBufferIndex*5;
+  //     }
 
-      peak[analogBufferIndex] = peakValue;
-    }
-  }
+  //     peak[analogBufferIndex] = peakValue;
+  //   }
+  // }
 
   adc0_buffer[analogBufferIndex] = adc0Value;
 
@@ -2825,6 +2825,55 @@ void adc0_isr(void)
 
 void updateResults()
 {
+  for (int i = 0; i < ANALOG_BUFFER_SIZE; i++)
+    {
+      adc0Value = adc0_buffer[i];
+
+      //if in measuring window
+      // if ((i > windowBegin * 2) && (i < windowEnd * 2))
+      // { // from % to index of 0-200
+
+        // check peak
+        if (adc0Value > peakValue)
+        {
+          peakValue = adc0Value;
+        }
+
+        // check threshold crossing
+        if ((peakValue > thre256 + hmdThresholdHyst) || (digitalReadFast(LED_SIGNAL) && (peakValue > thre256 - hmdThresholdHyst)))
+        {
+
+          // check for rising edge
+          if (!risingEdgeTime)
+          {                                                                              // only first occurence
+            //risingEdgeTime = ((micros() - motorTimeNow) % 1000); // range per mirror 0-1000 us
+            //risingEdgeTime = ((micros() - motorTimeNow + (positionOffset * 10)) % 1000); // range per mirror 0-1000 us
+            risingEdgeTime = i + positionOffset*5;
+          }
+
+          // check for peak (but signal can be unstable)
+          // if (peak[i - 1] + 5 < peakValue)
+          // {
+          //   //peakValueTime = ((micros() - motorTimeNow + (positionOffset * 10)) % 1000); // range per mirror 0-1000 us
+          //   peakValueTime = i * 5;
+          // }
+
+          // check for falling edge
+          if (!fallingEdgeTime                                    // only the first occurence
+              && ((adc0Value < (thre256 - hmdThresholdHyst - 13)) // added additional hysteresis to avoid flickering
+                  || (i == windowEnd * 2 - 1))    // or when real signal falling edge is not in measuring window (first occurence)
+          )
+          {
+            //fallingEdgeTime = ((micros() - motorTimeNow + (positionOffset * 10)) % 1000); // range per mirror 0-1000 us
+            fallingEdgeTime = i * 5;
+          }
+
+          //peak[i] = peakValue;
+        }
+      //}
+
+    }
+
   // check SIGNAL PRESENT
   if (peakValue < thre256 - hmdThresholdHyst)
   {
@@ -2909,9 +2958,9 @@ void updateResults()
   //if (dataSent && motorPulseIndex == 0) // prepare data for visualization on PC, only first mirror
   if (dataSent && motorPulseIndex == (filterPosition % 6)) // possibility to view different mirrors by changing positionFilter
   {
-    for (int i = 0; i < ANALOG_BUFFER_SIZE; i++)
+    for (int i = 0; i < 25; i++)
     {
-      value_buffer[i] = adc0_buffer[i];
+      value_buffer[i] = adc0_buffer[i*20+10]<<8 | adc0_buffer[i*20]; // MSB = value_buffer[i*20+10] , LSB = value_buffer[i*20] ; to sent only 50 of 500
       //value_peak[i] = peak[i];
     }
 
@@ -3002,7 +3051,8 @@ void checkModbus()
     for (byte i = 0; i < (EXEC_TIME_ADC - AN_VALUES); i++) // EXEC_TIME_ADC = AN_VALUES + 25
     {
       //holdingRegs[i+AN_VALUES] = value_buffer[i*8];
-      holdingRegs[i + AN_VALUES] = value_buffer[i * 8 + 4] << 8 | value_buffer[i * 8]; // MSB = value_buffer[i*8+4] , LSB = value_buffer[i*8] ; only 50 of 200
+      //holdingRegs[i + AN_VALUES] = value_buffer[i * 8 + 4] << 8 | value_buffer[i * 8]; // MSB = value_buffer[i*8+4] , LSB = value_buffer[i*8] ; only 50 of 200
+      holdingRegs[i+AN_VALUES] = value_buffer[i]; // values stored properly in updateResults() to save memory
     }
 
     dataSent = true;

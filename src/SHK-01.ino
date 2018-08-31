@@ -1871,7 +1871,7 @@ void showAnalogMenu(void)
   if (currentMenuOption == 3)
     displayPrint("AnO %s", menu_analogOutModeDisp[analogOutMode]);
   if (currentMenuOption == 4)
-    displayPrint("Offs%3d%%", positionOffset);
+    displayPrint("Offs%4d", positionOffset);
 
   if (lastKey == BTN_A)
   {
@@ -2141,17 +2141,17 @@ void setPositionOffset(void)
     menuTimeout = TIMEOUT_MENU;
 
   if (blinkMenu)
-    displayPrint("Offs%3d%%", menu_positionOffset);
+    displayPrint("Offs%4d", menu_positionOffset);
   else
-    displayPrint("    %3d%%", menu_positionOffset);
+    displayPrint("    %4d", menu_positionOffset);
 
   if (lastKey == BTN_AH)
   { // decrement
-    menu_positionOffset--;
+    menu_positionOffset = menu_positionOffset - 10;
   }
   if (lastKey == BTN_BH)
   { // increment
-    menu_positionOffset++;
+    menu_positionOffset = menu_positionOffset + 10;
   }
 
   if (lastKey == BTN_A)
@@ -2164,10 +2164,10 @@ void setPositionOffset(void)
   }
 
   //check range, min 5, max 95
-  if (menu_positionOffset < 5)
-    menu_positionOffset = 95;
-  if (menu_positionOffset > 95)
-    menu_positionOffset = 5;
+  if (menu_positionOffset < 0)
+    menu_positionOffset = 500;
+  if (menu_positionOffset > 500)
+    menu_positionOffset = 0;
 
   if (lastKey == BTN_NONE)
   { // ESC
@@ -2721,8 +2721,12 @@ void timer500us_isr(void)
   if (digitalReadFast(MOTOR_CLK))
   {
     hourTimeout--; // every 1ms
-    delayOffset = (1000 - (motorTimeNow % 1000) + positionOffset * 5) % 500; 
-    TeensyDelay::trigger(delayOffset, 0);
+
+    if ((motorTimeDiff < (6000 + 50)) || (motorTimeDiff > (6000 - 50)))
+    { //motor is in full speed at 6000us per rot.
+      delayOffset = (1000 - (motorTimeNow % 1000) + positionOffset) % 1000;
+      TeensyDelay::trigger(delayOffset, 0);
+    }
   }
 }
 
@@ -2731,7 +2735,7 @@ void motor_isr(void)
 {
   motorPulseIndex++;
   //analogBufferIndex = positionOffset * 2; // from % to 0-200
-  //TeensyDelay::trigger(1000,0);
+  
 
   if (motorPulseIndex > 5)
   { // one time per turn
@@ -2739,11 +2743,17 @@ void motor_isr(void)
     motorTimeNow = micros();
     motorTimeDiff = motorTimeNow - motorTimeOld; // time of one rotation = 6000us
     motorPulseIndex = 0;
+    
+    // if ((motorTimeDiff < (6000 + 50)) || (motorTimeDiff > (6000 - 50)))
+    // { //motor is in full speed at 6000us per rot.
+    //   TeensyDelay::trigger(positionOffset, 0);
+    // }
   } // one time per turn
 }
 
 void callback_delay()
 {
+  //if (motorPulseIndex < 6) TeensyDelay::trigger(1000, 0);
   // adc->enableInterrupts(ADC_0);
   //adc->adc0->startPDB(freq); //frequency in Hz
   analogBufferIndex = 0;
@@ -3054,8 +3064,6 @@ long approxSimpleMovingAverage(int new_value, int period)
 //   // digitalWriteFast(LED_POWER, LOW);  //debug
 // }
 
-
-
 void checkSTATUS()
 {
   bitWrite(io_state, IO_LASER, digitalRead(LASER));
@@ -3257,7 +3265,7 @@ void checkModbus()
     eeprom_writeInt(EE_ADDR_analog_out_mode, analogOutMode);
   }
 
-  if (holdingRegs[POSITION_OFFSET] != positionOffset && holdingRegs[POSITION_OFFSET] >= 5 && holdingRegs[POSITION_OFFSET] <= 95)
+  if (holdingRegs[POSITION_OFFSET] != positionOffset && holdingRegs[POSITION_OFFSET] >= 0 && holdingRegs[POSITION_OFFSET] <= 500)
   {
     positionOffset = holdingRegs[POSITION_OFFSET];
     eeprom_writeInt(EE_ADDR_position_offset, positionOffset);

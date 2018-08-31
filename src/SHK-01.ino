@@ -101,9 +101,9 @@ float sma = 0;
 
 // Define pins for the LED display.
 // You can change these, just re-wire your board:
-#define dataPin 7        // 7 connects to the display's data in
+#define dataPin 7           // 7 connects to the display's data in
 #define registerSelectPin 6 // 6 the display's register select pin
-#define clockPin 5       // 5 the display's clock pin
+#define clockPin 5          // 5 the display's clock pin
 #define enablePin 4         // 4 the display's chip enable pin
 #define resetPin 3          // 3 the display's reset pin
 
@@ -206,8 +206,8 @@ volatile int btnNoneCounter = 0;
 #define ANALOG_BUFFER_SIZE 200
 unsigned int freq = 40000;
 
-ADC *adc = new ADC();                         // adc object
-volatile DMAMEM uint16_t adc0_buf[ANALOG_BUFFER_SIZE]; // buffer 1...
+ADC *adc = new ADC();                                 // adc object
+volatile DMAMEM int16_t adc0_buf[ANALOG_BUFFER_SIZE]; // buffer 1...
 volatile uint8_t adc0_busy = 0;
 DMAChannel adc0_dma;
 // References for ISRs...
@@ -219,7 +219,7 @@ volatile int value_buffer[25];
 //volatile int value_peak[ANALOG_BUFFER_SIZE];
 volatile int adc0Value = 0;         //analog value
 volatile int analogBufferIndex = 0; //analog buffer pointer
-
+volatile int delayOffset = 0;
 // sensor variables
 volatile int thre256 = 75, thre = 30, thre1 = 30, thre2 = 50;
 volatile int hmdThresholdHyst = 13;
@@ -465,7 +465,7 @@ void setup()
   adc->enablePGA(pga, ADC_0);
 
   // Lets setup Analog 0 dma
-  adc0_dma.source((volatile uint16_t&)ADC0_RA);
+  adc0_dma.source((volatile uint16_t &)ADC0_RA);
   adc0_dma.destinationBuffer(adc0_buf, sizeof(adc0_buf));
   adc0_dma.triggerAtHardwareEvent(DMAMUX_SOURCE_ADC0);
   adc0_dma.interruptAtCompletion();
@@ -508,10 +508,10 @@ void setup()
   }
 
   TeensyDelay::begin();
-  TeensyDelay::addDelayChannel(callback_delay,0); //setup channel 0 
+  TeensyDelay::addDelayChannel(callback_delay, 0); //setup channel 0
 
   //clear data buffers
-  memset((void*)adc0_buf, 0, sizeof(adc0_buf));
+  memset((void *)adc0_buf, 0, sizeof(adc0_buf));
   // for (int i = 0; i < ANALOG_BUFFER_SIZE; i++)
   // {
   //   //adc0_buffer[i] = 0;
@@ -2654,7 +2654,6 @@ void timer500us_isr(void)
   //update timeouts
   //if (lastSentTimeout) {lastSentTimeout--;}
   //if (lastPressTimeout) {lastPressTimeout--;}
-  
 
   if (refreshMenuTimeout)
   {
@@ -2723,12 +2722,11 @@ void timer500us_isr(void)
   }
 
   if (digitalReadFast(MOTOR_CLK))
-    {
-      hourTimeout--; // every 1ms
-      TeensyDelay::trigger(positionOffset*5 - motorTimeNow % 1000 ,0);
-      
-      
-    }
+  {
+    hourTimeout--; // every 1ms
+    delayOffset = 1000 - (motorTimeNow % 1000) + positionOffset * 5; 
+    TeensyDelay::trigger(delayOffset, 0);
+  }
 }
 
 // motor (from HALL sensor) interrupt
@@ -2744,12 +2742,26 @@ void motor_isr(void)
     motorTimeNow = micros();
     motorTimeDiff = motorTimeNow - motorTimeOld; // time of one rotation = 6000us
     motorPulseIndex = 0;
-    
-    //TeensyDelay::trigger(positionOffset*5,0);
-    //if (motorTimeDiff ==6000) callback_delay();
-
-    
   } // one time per turn
+}
+
+void callback_delay()
+{
+  // adc->enableInterrupts(ADC_0);
+  //adc->adc0->startPDB(freq); //frequency in Hz
+  analogBufferIndex = 0;
+  exectime = micros();
+  memset((void *)adc0_buf, 0, sizeof(adc0_buf));
+  adc0_busy = 1;
+  adc->analogReadDifferential(A10, A11, ADC_0); //start ADC_0 differential
+
+  adc0_dma.enable();
+  adc->enableDMA(ADC_0);
+  adc0_dma.enable();
+
+  NVIC_DISABLE_IRQ(IRQ_PDB);
+  //Serial.println("Start PDB");
+  adc->adc0->startPDB(400000);
 }
 
 void adc0_dma_isr(void)
@@ -2758,213 +2770,78 @@ void adc0_dma_isr(void)
   adc0_dma.clearInterrupt();
   adc0_dma.clearComplete();
   //Serial.println("DMA interrupt");
-  PDB0_CH1C1 = 0;   // clear PDB channel control register - should be implemented in stopPDB()
+  PDB0_CH1C1 = 0; // clear PDB channel control register - should be implemented in stopPDB()
   PDB0_CH0C1 = 0;
 
   adc->adc0->stopPDB();
   adc0_dma.disable();
   adc->disableDMA(ADC_0);
   adc0_dma.disable();
- 
-   holdingRegs[EXEC_TIME_ADC] = micros() - exectime; // exectime of adc conversions
 
-    // update outputs
-    updateResults();
+  holdingRegs[EXEC_TIME_ADC] = micros() - exectime; // exectime of adc conversions
 
-    // update PGA
-    adc->enablePGA(pga, ADC_0);
+  // update outputs
+  updateResults();
 
-    holdingRegs[EXEC_TIME] = micros() - exectime;
+  // update PGA
+  adc->enablePGA(pga, ADC_0);
+
+  holdingRegs[EXEC_TIME] = micros() - exectime;
 }
-
-void callback_delay()
-{
-    // adc->enableInterrupts(ADC_0);
-    //adc->adc0->startPDB(freq); //frequency in Hz
-    analogBufferIndex = 0;
-    exectime = micros();
-    //memset((void*)adc0_buf, 0, sizeof(adc0_buf));
-    adc0_busy = 1;
-    adc->analogReadDifferential(A10, A11, ADC_0);             //start ADC_0 differential
-
-    adc0_dma.enable();
-    adc->enableDMA(ADC_0);
-    adc0_dma.enable();
-
-    NVIC_DISABLE_IRQ(IRQ_PDB);
-    //Serial.println("Start PDB");
-    adc->adc0->startPDB(400000);
-    
-
-    // while (adc0_busy) {
-    //   if ((micros() - exectime) > 20000000) {
-    //     Serial.printf("Timeout %d\n", adc0_busy);
-    //     break;
-    //   }
-    // }
-
-  // PDB0_CH1C1 = 0;   // clear PDB channel control register - should be implemented in stopPDB()
-  // PDB0_CH0C1 = 0;
-
-  // adc->adc0->stopPDB();
-  // adc0_dma.disable();
-  // adc->disableDMA(ADC_0);
-  // adc0_dma.disable();
- 
-  //  holdingRegs[EXEC_TIME_ADC] = micros() - exectime; // exectime of adc conversions
-
-  //   // update outputs
-  //   updateResults();
-
-  //   // update PGA
-  //   adc->enablePGA(pga, ADC_0);
-
-  //   holdingRegs[EXEC_TIME] = micros() - exectime;
-}
-
-//*****************************************************************
-// ADC interrupts
-// called everytime a new value is converted. The DMA isr is called first
-// void adc0_isr(void)
-// {
-//   //digitalWriteFast(LED_POWER, !digitalReadFast(LED_POWER)); //debug
-
-//   adc0Value = adc->adc0->readSingle();
-
-//   if (adc0Value < 0)
-//   { // prevent false results of 0xFFFF
-//     adc0Value = 0;
-//   }
-
-//   // clear old values
-//   //adc0_buffer[analogBufferIndex] = 0;
-//   //peak[analogBufferIndex] = 0;
-
-//   // //if in measuring window
-//   // if ((analogBufferIndex > windowBegin * 2) && (analogBufferIndex < windowEnd * 2))
-//   // { // from % to index of 0-200
-
-//   //   // check peak
-//   //   if (adc0Value > peakValue)
-//   //   {
-//   //     peakValue = adc0Value;
-//   //   }
-
-//   //   // check threshold crossing
-//   //   if ((peakValue > thre256 + hmdThresholdHyst) || (digitalReadFast(LED_SIGNAL) && (peakValue > thre256 - hmdThresholdHyst)))
-//   //   {
-
-//   //     // check for rising edge
-//   //     if (!risingEdgeTime)
-//   //     {                                                                              // only first occurence
-//   //       //risingEdgeTime = ((micros() - motorTimeNow) % 1000); // range per mirror 0-1000 us
-//   //       //risingEdgeTime = ((micros() - motorTimeNow + (positionOffset * 10)) % 1000); // range per mirror 0-1000 us
-//   //       risingEdgeTime = analogBufferIndex * 5;
-//   //     }
-
-//   //     // check for peak (but signal can be unstable)
-//   //     if (peak[analogBufferIndex - 1] + 5 < peakValue)
-//   //     {
-//   //       peakValueTime = ((micros() - motorTimeNow + (positionOffset * 10)) % 1000); // range per mirror 0-1000 us
-//   //       //peakValueTime = analogBufferIndex * 5;
-//   //     }
-
-//   //     // check for falling edge
-//   //     if (!fallingEdgeTime                                    // only the first occurence
-//   //         && ((adc0Value < (thre256 - hmdThresholdHyst - 13)) // added additional hysteresis to avoid flickering
-//   //             || (analogBufferIndex == windowEnd * 2 - 1))    // or when real signal falling edge is not in measuring window (first occurence)
-//   //     )
-//   //     {
-//   //       fallingEdgeTime = ((micros() - motorTimeNow + (positionOffset * 10)) % 1000); // range per mirror 0-1000 us
-//   //       //fallingEdgeTime = analogBufferIndex*5;
-//   //     }
-
-//   //     peak[analogBufferIndex] = peakValue;
-//   //   }
-//   // }
-
-//   adc0_buffer[analogBufferIndex] = adc0Value;
-
-//   //increment buffer index
-//   if (analogBufferIndex < ANALOG_BUFFER_SIZE - 1)
-//   { // some delay for update results
-//     analogBufferIndex++;
-//   }
-//   else
-//   {
-//     adc->disableInterrupts(ADC_0);
-//     //adc->adc0->stopPDB();
-
-//     holdingRegs[EXEC_TIME_ADC] = micros() - exectime; // exectime of adc conversions
-
-//     // update outputs
-//     updateResults();
-
-//     // update PGA
-//     adc->enablePGA(pga, ADC_0);
-
-//     holdingRegs[EXEC_TIME] = micros() - exectime; // exectime of adc conversions + results calculation
-
-//     // adc->enableInterrupts(ADC_0);
-//     // //adc->adc0->startPDB(freq); //frequency in Hz
-//     // analogBufferIndex = 0;
-
-    
-//   }
-
-//   // digitalWriteFast(LED_POWER, LOW);  //debug
-// }
 
 void updateResults()
 {
   for (int i = 0; i < ANALOG_BUFFER_SIZE; i++)
-    {
-      adc0Value = adc0_buf[i];
+  {
 
-      //if in measuring window
-      // if ((i > windowBegin * 2) && (i < windowEnd * 2))
-      // { // from % to index of 0-200
+    if (adc0_buf[i] < 0)
+      adc0_buf[i] = 0;
 
-        // check peak
-        if (adc0Value > peakValue)
-        {
-          peakValue = adc0Value;
+    adc0Value = adc0_buf[i];
+
+    //if in measuring window
+    if ((i > windowBegin * 2) && (i < windowEnd * 2))
+    { // from % to index of 0-200
+
+      // check peak
+      if (adc0Value > peakValue)
+      {
+        peakValue = adc0Value;
+      }
+
+      // check threshold crossing
+      if ((peakValue > thre256 + hmdThresholdHyst) || (digitalReadFast(LED_SIGNAL) && (peakValue > thre256 - hmdThresholdHyst)))
+      {
+
+        // check for rising edge
+        if (!risingEdgeTime)
+        { // only first occurence
+          //risingEdgeTime = ((micros() - motorTimeNow) % 1000); // range per mirror 0-1000 us
+          //risingEdgeTime = ((micros() - motorTimeNow + (positionOffset * 10)) % 1000); // range per mirror 0-1000 us
+          risingEdgeTime = i * 5;
         }
 
-        // check threshold crossing
-        if ((peakValue > thre256 + hmdThresholdHyst) || (digitalReadFast(LED_SIGNAL) && (peakValue > thre256 - hmdThresholdHyst)))
+        // check for peak (but signal can be unstable)
+        if (peak[i - 1] + 5 < peakValue)
         {
-
-          // check for rising edge
-          if (!risingEdgeTime)
-          {                                                                              // only first occurence
-            //risingEdgeTime = ((micros() - motorTimeNow) % 1000); // range per mirror 0-1000 us
-            //risingEdgeTime = ((micros() - motorTimeNow + (positionOffset * 10)) % 1000); // range per mirror 0-1000 us
-            risingEdgeTime = i*5;
-          }
-
-          // check for peak (but signal can be unstable)
-          if (peak[i - 1] + 5 < peakValue)
-          {
-            //peakValueTime = ((micros() - motorTimeNow + (positionOffset * 10)) % 1000); // range per mirror 0-1000 us
-            peakValueTime = i * 5;
-          }
-
-          // check for falling edge
-          if (!fallingEdgeTime                                    // only the first occurence
-              && ((adc0Value < (thre256 - hmdThresholdHyst - 13)) // added additional hysteresis to avoid flickering
-                  || (i == windowEnd * 2 - 1))    // or when real signal falling edge is not in measuring window (first occurence)
-          )
-          {
-            //fallingEdgeTime = ((micros() - motorTimeNow + (positionOffset * 10)) % 1000); // range per mirror 0-1000 us
-            fallingEdgeTime = i * 5;
-          }
-
-          peak[i] = peakValue;
+          //peakValueTime = ((micros() - motorTimeNow + (positionOffset * 10)) % 1000); // range per mirror 0-1000 us
+          peakValueTime = i * 5;
         }
-      //}
 
+        // check for falling edge
+        if (!fallingEdgeTime                                    // only the first occurence
+            && ((adc0Value < (thre256 - hmdThresholdHyst - 13)) // added additional hysteresis to avoid flickering
+                || (i == windowEnd * 2 - 1))                    // or when real signal falling edge is not in measuring window (first occurence)
+        )
+        {
+          //fallingEdgeTime = ((micros() - motorTimeNow + (positionOffset * 10)) % 1000); // range per mirror 0-1000 us
+          fallingEdgeTime = i * 5;
+        }
+
+        peak[i] = peakValue;
+      }
     }
+  }
 
   // check SIGNAL PRESENT
   if (peakValue < thre256 - hmdThresholdHyst)
@@ -3088,6 +2965,100 @@ long approxSimpleMovingAverage(int new_value, int period)
     return new_value;
 }
 
+//*****************************************************************
+// ADC interrupts
+// called everytime a new value is converted. The DMA isr is called first
+// void adc0_isr(void)
+// {
+//   //digitalWriteFast(LED_POWER, !digitalReadFast(LED_POWER)); //debug
+
+//   adc0Value = adc->adc0->readSingle();
+
+//   if (adc0Value < 0)
+//   { // prevent false results of 0xFFFF
+//     adc0Value = 0;
+//   }
+
+//   // clear old values
+//   //adc0_buffer[analogBufferIndex] = 0;
+//   //peak[analogBufferIndex] = 0;
+
+//   // //if in measuring window
+//   // if ((analogBufferIndex > windowBegin * 2) && (analogBufferIndex < windowEnd * 2))
+//   // { // from % to index of 0-200
+
+//   //   // check peak
+//   //   if (adc0Value > peakValue)
+//   //   {
+//   //     peakValue = adc0Value;
+//   //   }
+
+//   //   // check threshold crossing
+//   //   if ((peakValue > thre256 + hmdThresholdHyst) || (digitalReadFast(LED_SIGNAL) && (peakValue > thre256 - hmdThresholdHyst)))
+//   //   {
+
+//   //     // check for rising edge
+//   //     if (!risingEdgeTime)
+//   //     {                                                                              // only first occurence
+//   //       //risingEdgeTime = ((micros() - motorTimeNow) % 1000); // range per mirror 0-1000 us
+//   //       //risingEdgeTime = ((micros() - motorTimeNow + (positionOffset * 10)) % 1000); // range per mirror 0-1000 us
+//   //       risingEdgeTime = analogBufferIndex * 5;
+//   //     }
+
+//   //     // check for peak (but signal can be unstable)
+//   //     if (peak[analogBufferIndex - 1] + 5 < peakValue)
+//   //     {
+//   //       peakValueTime = ((micros() - motorTimeNow + (positionOffset * 10)) % 1000); // range per mirror 0-1000 us
+//   //       //peakValueTime = analogBufferIndex * 5;
+//   //     }
+
+//   //     // check for falling edge
+//   //     if (!fallingEdgeTime                                    // only the first occurence
+//   //         && ((adc0Value < (thre256 - hmdThresholdHyst - 13)) // added additional hysteresis to avoid flickering
+//   //             || (analogBufferIndex == windowEnd * 2 - 1))    // or when real signal falling edge is not in measuring window (first occurence)
+//   //     )
+//   //     {
+//   //       fallingEdgeTime = ((micros() - motorTimeNow + (positionOffset * 10)) % 1000); // range per mirror 0-1000 us
+//   //       //fallingEdgeTime = analogBufferIndex*5;
+//   //     }
+
+//   //     peak[analogBufferIndex] = peakValue;
+//   //   }
+//   // }
+
+//   adc0_buffer[analogBufferIndex] = adc0Value;
+
+//   //increment buffer index
+//   if (analogBufferIndex < ANALOG_BUFFER_SIZE - 1)
+//   { // some delay for update results
+//     analogBufferIndex++;
+//   }
+//   else
+//   {
+//     adc->disableInterrupts(ADC_0);
+//     //adc->adc0->stopPDB();
+
+//     holdingRegs[EXEC_TIME_ADC] = micros() - exectime; // exectime of adc conversions
+
+//     // update outputs
+//     updateResults();
+
+//     // update PGA
+//     adc->enablePGA(pga, ADC_0);
+
+//     holdingRegs[EXEC_TIME] = micros() - exectime; // exectime of adc conversions + results calculation
+
+//     // adc->enableInterrupts(ADC_0);
+//     // //adc->adc0->startPDB(freq); //frequency in Hz
+//     // analogBufferIndex = 0;
+
+//   }
+
+//   // digitalWriteFast(LED_POWER, LOW);  //debug
+// }
+
+
+
 void checkSTATUS()
 {
   bitWrite(io_state, IO_LASER, digitalRead(LASER));
@@ -3128,7 +3099,8 @@ void checkModbus()
 
   holdingRegs[ACT_TEMPERATURE] = celsius;
   holdingRegs[MAX_TEMPERATURE] = max_temperature;
-  holdingRegs[TOTAL_RUNTIME] = total_runtime;
+  //holdingRegs[TOTAL_RUNTIME] = total_runtime;
+  holdingRegs[TOTAL_RUNTIME] = delayOffset;
   holdingRegs[MOTOR_TIME_DIFF] = motorTimeDiff;
 
   holdingRegs[IO_STATE] = io_state;
@@ -3144,7 +3116,7 @@ void checkModbus()
     {
       //holdingRegs[i+AN_VALUES] = value_buffer[i*8];
       //holdingRegs[i + AN_VALUES] = value_buffer[i * 8 + 4] << 8 | value_buffer[i * 8]; // MSB = value_buffer[i*8+4] , LSB = value_buffer[i*8] ; only 50 of 200
-      holdingRegs[i+AN_VALUES] = value_buffer[i]; // values stored properly in updateResults() to save memory
+      holdingRegs[i + AN_VALUES] = value_buffer[i]; // values stored properly in updateResults() to save memory
     }
 
     dataSent = true;

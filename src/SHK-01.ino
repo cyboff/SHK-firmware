@@ -204,7 +204,7 @@ volatile int btnNoneCounter = 0;
 
 #define ADC0_AVERAGING 1
 #define ANALOG_BUFFER_SIZE 200
-unsigned int freq = 40000;
+unsigned int freq = 400000;
 
 ADC *adc = new ADC();                                 // adc object
 volatile DMAMEM int16_t adc0_buf[ANALOG_BUFFER_SIZE]; // buffer 1...
@@ -429,9 +429,6 @@ void setup()
   updateSPI(0, 0);
 
   // enable serial communication
-
-  Serial.begin(9600);
-  Serial.println("Test DMA Analog Read");
 
   holdingRegs[ENUM_SIZE] = TOTAL_REGS_SIZE;
 
@@ -2724,7 +2721,7 @@ void timer500us_isr(void)
   if (digitalReadFast(MOTOR_CLK))
   {
     hourTimeout--; // every 1ms
-    delayOffset = 1000 - (motorTimeNow % 1000) + positionOffset * 5; 
+    delayOffset = (1000 - (motorTimeNow % 1000) + positionOffset * 5) % 500; 
     TeensyDelay::trigger(delayOffset, 0);
   }
 }
@@ -2761,7 +2758,7 @@ void callback_delay()
 
   NVIC_DISABLE_IRQ(IRQ_PDB);
   //Serial.println("Start PDB");
-  adc->adc0->startPDB(400000);
+  adc->adc0->startPDB(freq);
 }
 
 void adc0_dma_isr(void)

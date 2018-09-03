@@ -211,7 +211,7 @@ volatile DMAMEM int16_t adc0_buf[ANALOG_BUFFER_SIZE]; // buffer 1...
 volatile uint8_t adc0_busy = 0;
 DMAChannel adc0_dma;
 // References for ISRs...
-extern void adc0_dma_isr(void);
+//extern void adc0_dma_isr(void);
 
 //volatile int adc0_buffer[ANALOG_BUFFER_SIZE]; // ADC_0 9-bit resolution for differential - sign + 8 bit
 volatile int peak[ANALOG_BUFFER_SIZE];
@@ -438,7 +438,7 @@ void setup()
 
   holdingRegs[EXEC_TIME] = 0;
 
-  // // Serial.begin(modbusSpeed);
+  Serial.begin(modbusSpeed);
 
   modbus_configure(modbusSpeed, modbusFormat, modbusID, TXEN, TOTAL_REGS_SIZE, 0);
 
@@ -509,11 +509,6 @@ void setup()
 
   //clear data buffers
   memset((void *)adc0_buf, 0, sizeof(adc0_buf));
-  // for (int i = 0; i < ANALOG_BUFFER_SIZE; i++)
-  // {
-  //   //adc0_buffer[i] = 0;
-  //   //peak[i] = 0;
-  // }
 
   // when motor is running, enable ADC0 interrupts
   //adc->enableInterrupts(ADC_0);
@@ -2722,9 +2717,9 @@ void timer500us_isr(void)
   {
     hourTimeout--; // every 1ms
 
-    if ((motorTimeDiff < (6000 + 50)) || (motorTimeDiff > (6000 - 50)))
-    { //motor is in full speed at 6000us per rot.
-      delayOffset = (1000 - (motorTimeNow % 1000) + positionOffset) % 1000;
+    if ((motorTimeDiff < (6000 + 50)) && (motorTimeDiff > (6000 - 50)))
+    { //motor is at full speed 6000us per rot.
+      delayOffset = (positionOffset - 1000 + ((micros() - motorTimeNow) % 1000))%500;
       TeensyDelay::trigger(delayOffset, 0);
     }
   }
@@ -2735,7 +2730,6 @@ void motor_isr(void)
 {
   motorPulseIndex++;
   //analogBufferIndex = positionOffset * 2; // from % to 0-200
-  
 
   if (motorPulseIndex > 5)
   { // one time per turn
@@ -2743,7 +2737,7 @@ void motor_isr(void)
     motorTimeNow = micros();
     motorTimeDiff = motorTimeNow - motorTimeOld; // time of one rotation = 6000us
     motorPulseIndex = 0;
-    
+
     // if ((motorTimeDiff < (6000 + 50)) || (motorTimeDiff > (6000 - 50)))
     // { //motor is in full speed at 6000us per rot.
     //   TeensyDelay::trigger(positionOffset, 0);
@@ -2756,24 +2750,27 @@ void callback_delay()
   //if (motorPulseIndex < 6) TeensyDelay::trigger(1000, 0);
   // adc->enableInterrupts(ADC_0);
   //adc->adc0->startPDB(freq); //frequency in Hz
+  if (!adc0_busy)
+  {
   analogBufferIndex = 0;
   exectime = micros();
   memset((void *)adc0_buf, 0, sizeof(adc0_buf));
+  
   adc0_busy = 1;
   adc->analogReadDifferential(A10, A11, ADC_0); //start ADC_0 differential
 
-  adc0_dma.enable();
+  //adc0_dma.enable();
   adc->enableDMA(ADC_0);
   adc0_dma.enable();
 
   NVIC_DISABLE_IRQ(IRQ_PDB);
   //Serial.println("Start PDB");
   adc->adc0->startPDB(freq);
+  } else adc0_dma_isr();
 }
 
 void adc0_dma_isr(void)
 {
-  adc0_busy = false;
   adc0_dma.clearInterrupt();
   adc0_dma.clearComplete();
   //Serial.println("DMA interrupt");
@@ -2794,6 +2791,7 @@ void adc0_dma_isr(void)
   adc->enablePGA(pga, ADC_0);
 
   holdingRegs[EXEC_TIME] = micros() - exectime;
+  adc0_busy = false;
 }
 
 void updateResults()

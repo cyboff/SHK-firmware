@@ -305,6 +305,8 @@ enum
   AN_VALUES,                      // 25 registers
   EXEC_TIME_ADC = AN_VALUES + 25, // exectime of adc conversions
   EXEC_TIME,                      // exectime of adc conversions + results calculation
+  EXEC_TIME_TRIGGER,              // exectime of each triggering
+  OFFSET_DELAY,                   // calculated trigger delay
   TOTAL_ERRORS,
   // leave this one
   TOTAL_REGS_SIZE
@@ -516,8 +518,8 @@ void setup()
 
 void loop()
 {
-  //callback_delay();
-  //TeensyDelay::trigger(100,0);
+  long loopexectime = micros();
+
   // check SET
   checkSET();
   // check TEST
@@ -536,6 +538,7 @@ void loop()
 
   //digitalWriteFast(LED_BUILTIN,LOW);
   //delay(500);
+  //holdingRegs[EXEC_TIME] = micros() - loopexectime;
 }
 
 // Display print wrapper
@@ -2158,10 +2161,10 @@ void setPositionOffset(void)
     menu_positionOffset++;
   }
 
-  //check range, min 5, max 95
+  //check range, min 0, max 999
   if (menu_positionOffset < 0)
-    menu_positionOffset = 500;
-  if (menu_positionOffset > 500)
+    menu_positionOffset = 999;
+  if (menu_positionOffset > 999)
     menu_positionOffset = 0;
 
   if (lastKey == BTN_NONE)
@@ -2717,12 +2720,17 @@ void timer500us_isr(void)
   {
     hourTimeout--; // every 1ms
 
+    //if ((motorTimeDiff < (6000 + 50)) && (motorTimeDiff > (6000 - 50)) && !adc0_busy)
     if ((motorTimeDiff < (6000 + 50)) && (motorTimeDiff > (6000 - 50)))
     { //motor is at full speed 6000us per rot.
-      delayOffset = (positionOffset - 1000 + ((micros() - motorTimeNow) % 1000))%500;
+      delayOffset = (positionOffset - ((micros() - motorTimeNow) % 1000)) % 500;
       TeensyDelay::trigger(delayOffset, 0);
+      holdingRegs[EXEC_TIME_TRIGGER] = micros() - exectime;
     }
+    else
+      holdingRegs[EXEC_TIME_TRIGGER] = motorPulseIndex;
   }
+  //holdingRegs[EXEC_TIME_TRIGGER] = (micros() - motorTimeNow) % 1000;
 }
 
 // motor (from HALL sensor) interrupt
@@ -2737,36 +2745,30 @@ void motor_isr(void)
     motorTimeNow = micros();
     motorTimeDiff = motorTimeNow - motorTimeOld; // time of one rotation = 6000us
     motorPulseIndex = 0;
-
-    // if ((motorTimeDiff < (6000 + 50)) || (motorTimeDiff > (6000 - 50)))
-    // { //motor is in full speed at 6000us per rot.
-    //   TeensyDelay::trigger(positionOffset, 0);
-    // }
   } // one time per turn
 }
 
 void callback_delay()
 {
-  //if (motorPulseIndex < 6) TeensyDelay::trigger(1000, 0);
-  // adc->enableInterrupts(ADC_0);
-  //adc->adc0->startPDB(freq); //frequency in Hz
   if (!adc0_busy)
   {
-  analogBufferIndex = 0;
-  exectime = micros();
-  memset((void *)adc0_buf, 0, sizeof(adc0_buf));
-  
-  adc0_busy = 1;
-  adc->analogReadDifferential(A10, A11, ADC_0); //start ADC_0 differential
+    analogBufferIndex = 0;
+    exectime = micros();
+    memset((void *)adc0_buf, 0, sizeof(adc0_buf));
 
-  //adc0_dma.enable();
-  adc->enableDMA(ADC_0);
-  adc0_dma.enable();
+    adc0_busy = 1;
+    // update PGA
+    adc->enablePGA(pga, ADC_0);
+    adc->analogReadDifferential(A10, A11, ADC_0); //start ADC_0 differential
 
-  NVIC_DISABLE_IRQ(IRQ_PDB);
-  //Serial.println("Start PDB");
-  adc->adc0->startPDB(freq);
-  } else adc0_dma_isr();
+    //adc0_dma.enable();
+    adc->enableDMA(ADC_0);
+    adc0_dma.enable();
+
+    NVIC_DISABLE_IRQ(IRQ_PDB);
+    //Serial.println("Start PDB");
+    adc->adc0->startPDB(freq);
+  } //else adc0_dma_isr();
 }
 
 void adc0_dma_isr(void)
@@ -2781,17 +2783,14 @@ void adc0_dma_isr(void)
   adc0_dma.disable();
   adc->disableDMA(ADC_0);
   adc0_dma.disable();
+  adc0_busy = false;
 
   holdingRegs[EXEC_TIME_ADC] = micros() - exectime; // exectime of adc conversions
 
   // update outputs
   updateResults();
 
-  // update PGA
-  adc->enablePGA(pga, ADC_0);
-
   holdingRegs[EXEC_TIME] = micros() - exectime;
-  adc0_busy = false;
 }
 
 void updateResults()
@@ -2970,98 +2969,6 @@ long approxSimpleMovingAverage(int new_value, int period)
     return new_value;
 }
 
-//*****************************************************************
-// ADC interrupts
-// called everytime a new value is converted. The DMA isr is called first
-// void adc0_isr(void)
-// {
-//   //digitalWriteFast(LED_POWER, !digitalReadFast(LED_POWER)); //debug
-
-//   adc0Value = adc->adc0->readSingle();
-
-//   if (adc0Value < 0)
-//   { // prevent false results of 0xFFFF
-//     adc0Value = 0;
-//   }
-
-//   // clear old values
-//   //adc0_buffer[analogBufferIndex] = 0;
-//   //peak[analogBufferIndex] = 0;
-
-//   // //if in measuring window
-//   // if ((analogBufferIndex > windowBegin * 2) && (analogBufferIndex < windowEnd * 2))
-//   // { // from % to index of 0-200
-
-//   //   // check peak
-//   //   if (adc0Value > peakValue)
-//   //   {
-//   //     peakValue = adc0Value;
-//   //   }
-
-//   //   // check threshold crossing
-//   //   if ((peakValue > thre256 + hmdThresholdHyst) || (digitalReadFast(LED_SIGNAL) && (peakValue > thre256 - hmdThresholdHyst)))
-//   //   {
-
-//   //     // check for rising edge
-//   //     if (!risingEdgeTime)
-//   //     {                                                                              // only first occurence
-//   //       //risingEdgeTime = ((micros() - motorTimeNow) % 1000); // range per mirror 0-1000 us
-//   //       //risingEdgeTime = ((micros() - motorTimeNow + (positionOffset * 10)) % 1000); // range per mirror 0-1000 us
-//   //       risingEdgeTime = analogBufferIndex * 5;
-//   //     }
-
-//   //     // check for peak (but signal can be unstable)
-//   //     if (peak[analogBufferIndex - 1] + 5 < peakValue)
-//   //     {
-//   //       peakValueTime = ((micros() - motorTimeNow + (positionOffset * 10)) % 1000); // range per mirror 0-1000 us
-//   //       //peakValueTime = analogBufferIndex * 5;
-//   //     }
-
-//   //     // check for falling edge
-//   //     if (!fallingEdgeTime                                    // only the first occurence
-//   //         && ((adc0Value < (thre256 - hmdThresholdHyst - 13)) // added additional hysteresis to avoid flickering
-//   //             || (analogBufferIndex == windowEnd * 2 - 1))    // or when real signal falling edge is not in measuring window (first occurence)
-//   //     )
-//   //     {
-//   //       fallingEdgeTime = ((micros() - motorTimeNow + (positionOffset * 10)) % 1000); // range per mirror 0-1000 us
-//   //       //fallingEdgeTime = analogBufferIndex*5;
-//   //     }
-
-//   //     peak[analogBufferIndex] = peakValue;
-//   //   }
-//   // }
-
-//   adc0_buffer[analogBufferIndex] = adc0Value;
-
-//   //increment buffer index
-//   if (analogBufferIndex < ANALOG_BUFFER_SIZE - 1)
-//   { // some delay for update results
-//     analogBufferIndex++;
-//   }
-//   else
-//   {
-//     adc->disableInterrupts(ADC_0);
-//     //adc->adc0->stopPDB();
-
-//     holdingRegs[EXEC_TIME_ADC] = micros() - exectime; // exectime of adc conversions
-
-//     // update outputs
-//     updateResults();
-
-//     // update PGA
-//     adc->enablePGA(pga, ADC_0);
-
-//     holdingRegs[EXEC_TIME] = micros() - exectime; // exectime of adc conversions + results calculation
-
-//     // adc->enableInterrupts(ADC_0);
-//     // //adc->adc0->startPDB(freq); //frequency in Hz
-//     // analogBufferIndex = 0;
-
-//   }
-
-//   // digitalWriteFast(LED_POWER, LOW);  //debug
-// }
-
 void checkSTATUS()
 {
   bitWrite(io_state, IO_LASER, digitalRead(LASER));
@@ -3102,11 +3009,12 @@ void checkModbus()
 
   holdingRegs[ACT_TEMPERATURE] = celsius;
   holdingRegs[MAX_TEMPERATURE] = max_temperature;
-  //holdingRegs[TOTAL_RUNTIME] = total_runtime;
-  holdingRegs[TOTAL_RUNTIME] = delayOffset;
+  holdingRegs[TOTAL_RUNTIME] = total_runtime;
   holdingRegs[MOTOR_TIME_DIFF] = motorTimeDiff;
 
   holdingRegs[IO_STATE] = io_state;
+
+  holdingRegs[OFFSET_DELAY] = delayOffset;
 
   // updated in updateResults()
   holdingRegs[PEAK_VALUE] = peakValueDisp;
@@ -3263,7 +3171,7 @@ void checkModbus()
     eeprom_writeInt(EE_ADDR_analog_out_mode, analogOutMode);
   }
 
-  if (holdingRegs[POSITION_OFFSET] != positionOffset && holdingRegs[POSITION_OFFSET] >= 0 && holdingRegs[POSITION_OFFSET] <= 500)
+  if (holdingRegs[POSITION_OFFSET] != positionOffset && holdingRegs[POSITION_OFFSET] >= 0 && holdingRegs[POSITION_OFFSET] <= 999)
   {
     positionOffset = holdingRegs[POSITION_OFFSET];
     eeprom_writeInt(EE_ADDR_position_offset, positionOffset);

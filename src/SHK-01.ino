@@ -2719,18 +2719,24 @@ void timer500us_isr(void)
   if (digitalReadFast(MOTOR_CLK))
   {
     hourTimeout--; // every 1ms
+  }
 
-    //if ((motorTimeDiff < (6000 + 50)) && (motorTimeDiff > (6000 - 50)) && !adc0_busy)
-    if ((motorTimeDiff < (6000 + 50)) && (motorTimeDiff > (6000 - 50)))
-    { //motor is at full speed 6000us per rot.
-      delayOffset = (positionOffset - ((micros() - motorTimeNow) % 1000)) % 500;
+  if ((motorTimeDiff < (6000 + 50)) && (motorTimeDiff > (6000 - 50))) //motor is at full speed 6000us per rot.
+  {
+    if (positionOffset <= 500 && digitalReadFast(MOTOR_CLK))
+    {
+      delayOffset = (((micros() - motorTimeNow) % 500) - positionOffset);
       TeensyDelay::trigger(delayOffset, 0);
       holdingRegs[EXEC_TIME_TRIGGER] = micros() - exectime;
     }
-    else
-      holdingRegs[EXEC_TIME_TRIGGER] = motorPulseIndex;
+
+    if (positionOffset > 500 && !digitalReadFast(MOTOR_CLK))
+    {
+      delayOffset = (((micros() - motorTimeNow) % 500) - (positionOffset % 500));
+      TeensyDelay::trigger(delayOffset, 0);
+      holdingRegs[EXEC_TIME_TRIGGER] = micros() - exectime;
+    }
   }
-  //holdingRegs[EXEC_TIME_TRIGGER] = (micros() - motorTimeNow) % 1000;
 }
 
 // motor (from HALL sensor) interrupt
@@ -2768,7 +2774,12 @@ void callback_delay()
     NVIC_DISABLE_IRQ(IRQ_PDB);
     //Serial.println("Start PDB");
     adc->adc0->startPDB(freq);
-  } //else adc0_dma_isr();
+  }
+  else
+  {
+    holdingRegs[EXEC_TIME_ADC] = motorPulseIndex;
+    //adc0_dma_isr();
+  }
 }
 
 void adc0_dma_isr(void)

@@ -2787,7 +2787,7 @@ void adc0_dma_isr(void)
   adc0_dma.clearInterrupt();
   adc0_dma.clearComplete();
   //Serial.println("DMA interrupt");
-  PDB0_CH1C1 = 0; // clear PDB channel control register - should be implemented in stopPDB()
+  //PDB0_CH1C1 = 0; // clear PDB channel control register - should be implemented in stopPDB()
   PDB0_CH0C1 = 0;
 
   adc->adc0->stopPDB();
@@ -2815,7 +2815,7 @@ void updateResults()
     adc0Value = adc0_buf[i];
 
     //if in measuring window
-    if ((i > windowBegin * 2) && (i < windowEnd * 2))
+    if (((i > windowBegin * 2) && (i < windowEnd * 2) && !digitalReadFast(FILTER_PIN)) || ((i > windowBegin * 2 - 5) && (i < windowEnd * 2 + 5) && digitalReadFast(FILTER_PIN))) 
     { // from % to index of 0-200
 
       // check peak

@@ -294,8 +294,6 @@ enum
   ACT_TEMPERATURE,
   MAX_TEMPERATURE,
   TOTAL_RUNTIME,
-
-  MOTOR_TIME_DIFF,
   IO_STATE,
 
   PEAK_VALUE,
@@ -303,7 +301,8 @@ enum
   POSITION_VALUE_AVG,
 
   AN_VALUES,                      // 25 registers
-  EXEC_TIME_ADC = AN_VALUES + 25, // exectime of adc conversions
+  MOTOR_TIME_DIFF = AN_VALUES + 25,
+  EXEC_TIME_ADC,                  // exectime of adc conversions
   EXEC_TIME,                      // exectime of adc conversions + results calculation
   EXEC_TIME_TRIGGER,              // exectime of each triggering
   OFFSET_DELAY,                   // calculated trigger delay
@@ -518,7 +517,7 @@ void setup()
 
 void loop()
 {
-  long loopexectime = micros();
+  //long loopexectime = micros();
 
   // check SET
   checkSET();
@@ -2942,7 +2941,7 @@ void updateResults()
   //if (dataSent && motorPulseIndex == 0) // prepare data for visualization on PC, only first mirror
   if (dataSent && motorPulseIndex == (filterPosition % 6)) // possibility to view different mirrors by changing positionFilter
   {
-    for (int i = 0; i < 25; i++)
+    for (byte i = 0; i < (MOTOR_TIME_DIFF - AN_VALUES); i++) // MOTOR_TIME_DIFF = AN_VALUES + 25
     {
       value_buffer[i] = adc0_buf[i * 8 + 4] << 8 | adc0_buf[i * 8]; // MSB = value_buffer[i*8+4] , LSB = value_buffer[i*8] ; only 50 of 200
       //value_peak[i] = peak[i];
@@ -3021,10 +3020,9 @@ void checkModbus()
   holdingRegs[ACT_TEMPERATURE] = celsius;
   holdingRegs[MAX_TEMPERATURE] = max_temperature;
   holdingRegs[TOTAL_RUNTIME] = total_runtime;
-  holdingRegs[MOTOR_TIME_DIFF] = motorTimeDiff;
-
   holdingRegs[IO_STATE] = io_state;
 
+  holdingRegs[MOTOR_TIME_DIFF] = motorTimeDiff;
   holdingRegs[OFFSET_DELAY] = delayOffset;
 
   // updated in updateResults()
@@ -3034,7 +3032,7 @@ void checkModbus()
 
   if (!dataSent)
   {
-    for (byte i = 0; i < (EXEC_TIME_ADC - AN_VALUES); i++) // EXEC_TIME_ADC = AN_VALUES + 25
+    for (byte i = 0; i < (MOTOR_TIME_DIFF - AN_VALUES); i++) // MOTOR_TIME_DIFF = AN_VALUES + 25
     {
       //holdingRegs[i+AN_VALUES] = value_buffer[i*8];
       //holdingRegs[i + AN_VALUES] = value_buffer[i * 8 + 4] << 8 | value_buffer[i * 8]; // MSB = value_buffer[i*8+4] , LSB = value_buffer[i*8] ; only 50 of 200

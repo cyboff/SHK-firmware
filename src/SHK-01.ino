@@ -29,7 +29,7 @@
 //defaults EEPROM
 #define MODEL_TYPE 50
 #define MODEL_SERIAL_NUMBER 18001
-#define FW_VERSION 103
+#define FW_VERSION 303
 
 #define DEFAULT_MODBUS_ID MODEL_SERIAL_NUMBER % 1000 % 247 // MODBUS ID slave (range 1..247)
 #define DEFAULT_MODBUS_SPEED 19200
@@ -2772,7 +2772,7 @@ void callback_delay()
 
     NVIC_DISABLE_IRQ(IRQ_PDB);
     //Serial.println("Start PDB");
-    adc->adc0->startPDB(freq);
+    adc->adc0->startPDB(freq);     //check ADC_Module::startPDB() in ADC_Module.cpp for //NVIC_ENABLE_IRQ(IRQ_PDB);
   }
   else
   {
@@ -3230,6 +3230,8 @@ void checkModbus()
     }
   }
 }
+
+//check void ADC_Module::startPDB() in ADC_Module.cpp for //NVIC_ENABLE_IRQ(IRQ_PDB);
 
 // pdb interrupt is enabled in case you need it.
 // void pdb_isr(void) {

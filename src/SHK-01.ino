@@ -37,15 +37,15 @@
 
 #define DEFAULT_SET 0             // RELAY = 0 (REL1 || REL2), MAN1 = 1, MAN2 = 2
 #define DEFAULT_GAIN_SET1 16      // valid values 1,2,4,8,16,32,64
-#define DEFAULT_THRESHOLD_SET1 30 // min 20, max 80
+#define DEFAULT_THRESHOLD_SET1 50 // min 20, max 80
 #define DEFAULT_GAIN_SET2 32
 #define DEFAULT_THRESHOLD_SET2 50
 
-#define DEFAULT_WINDOW_BEGIN 5     // min 5, max 50
-#define DEFAULT_WINDOW_END 95      // min 50 max 95
+#define DEFAULT_WINDOW_BEGIN 20     // min 5, max 50
+#define DEFAULT_WINDOW_END 80      // min 50 max 95
 #define DEFAULT_POSITION_MODE 1    // hmd = 0, rising = 1, falling = 2, peak = 3
 #define DEFAULT_ANALOG_OUT_MODE 0  // an1/an2: "1Int2Pos" = 0, "1Pos2Int2" = 1, "1Int2Int" = 2, "1Pos2Pos" = 3
-#define DEFAULT_POSITION_OFFSET 50 // min 5, max 95 to avoid coincidence with pulse interrupts
+#define DEFAULT_POSITION_OFFSET 250 // min 5, max 95 to avoid coincidence with pulse interrupts
 
 #define DEFAULT_FILTER_POSITION 6 // range 0 - 9999 ms (or nr of mirrors) for moving average
 #define DEFAULT_FILTER_ON 0       // range 0 - 9999 ms

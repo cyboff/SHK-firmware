@@ -759,7 +759,7 @@ void showMainMenu(void)
 {
 
   if (currentMenuOption == 0)
-    displayPrint("Int %3d%%", (100 * peakValueDisp / 256));
+    displayPrint("Int %3d%%", peakValueDisp);
   else if (!menuTimeout)
     menuTimeout = TIMEOUT_MENU;
 
@@ -2889,8 +2889,6 @@ void updateResults()
     digitalWriteFast(OUT_SIGNAL, LOW);
   }
 
-  peakValueDisp = peakValue;
-
   switch (positionMode)
   { // for display
   case 1:
@@ -2912,26 +2910,31 @@ void updateResults()
 
   positionValueAvgDisp = map(positionValue, windowBegin * 10, windowEnd * 10, 0, 1000); // for display range 0 - 1000
 
-  positionValue = map(positionValue, windowBegin * 10, windowEnd * 10, 0, 65535); //remap for DAC range
+  positionValue = map(positionValue, windowBegin * 10, windowEnd * 10, 0, 65535); // remap for DAC range
+
+  peakValueDisp = map(peakValue, 0, 255, 0, 100); // for display 0 - 100%
+
+  peakValue = map(peakValue, 0, 255, 0, 65535); // remap for DAC range
 
   if (extTest || intTest) // check test mode and set outputs to 50% and 12mA
   {
-    peakValueDisp = 128;        //for display range 0 - 256
     positionValueDisp = 500;    //for display range 0 - 1000
     positionValueAvgDisp = 500; //for display range 0 - 1000
-    positionValue = 32768;      //for analog output
+    positionValue = 32767;      //for analog output
+    peakValueDisp = 50;         //for display range 0 - 100%
+    peakValue = 32767;
   }
 
   switch (analogOutMode)
   { //an1/an2: "1Int2Pos" = 0, "1Pos2Int" = 1, "1Int2Int" = 2, "1Pos2Pos" = 3
   case 0:
-    updateSPI((peakValueDisp << 8), positionValue); // range is 2x 16bit
+    updateSPI(peakValue, positionValue); // range is 2x 16bit
     break;
   case 1:
-    updateSPI(positionValue, (peakValueDisp << 8));
+    updateSPI(positionValue, peakValue);
     break;
   case 2:
-    updateSPI((peakValueDisp << 8), (peakValueDisp << 8));
+    updateSPI(peakValue, peakValue);
     break;
   case 3:
     updateSPI(positionValue, positionValue);

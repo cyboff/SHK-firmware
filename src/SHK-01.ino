@@ -2724,14 +2724,14 @@ void timer500us_isr(void)
   {
     if (positionOffset <= 500 && digitalReadFast(MOTOR_CLK))
     {
-      delayOffset = (((micros() - motorTimeNow) % 500) - positionOffset);
+      delayOffset = (250 - ((micros() - motorTimeNow)%500) + positionOffset);
       TeensyDelay::trigger(delayOffset, 0);
       holdingRegs[EXEC_TIME_TRIGGER] = micros() - exectime;
     }
 
     if (positionOffset > 500 && !digitalReadFast(MOTOR_CLK))
     {
-      delayOffset = (((micros() - motorTimeNow) % 500) - (positionOffset % 500));
+      delayOffset = (250 - ((micros() - motorTimeNow)%500) + (positionOffset % 500));
       TeensyDelay::trigger(delayOffset, 0);
       holdingRegs[EXEC_TIME_TRIGGER] = micros() - exectime;
     }

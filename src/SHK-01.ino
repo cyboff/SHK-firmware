@@ -2563,14 +2563,16 @@ void checkALARM()
   }
   else if (extTest)
   {
+    digitalWriteFast(OUT_ALARM_NEG, HIGH); //NO ALARM = negative output: 24V=OK
     if (!alarmChecked)
     {
       currentMenu = MENU_ALARM;
       currentMenuOption = 2;
     }
   }
-  else if (intTest && currentMenu != MENU_SETUP)
+  else if (intTest && (currentMenu != MENU_SETUP))
   {
+    digitalWriteFast(OUT_ALARM_NEG, HIGH); //NO ALARM = negative output: 24V=OK
     if (!alarmChecked)
     {
       currentMenu = MENU_ALARM;
@@ -2721,19 +2723,18 @@ void timer500us_isr(void)
   }
 
   if ((motorTimeDiff < (6000 + 50)) && (motorTimeDiff > (6000 - 50))) //motor is at full speed 6000us per rot.
-  {
+  { 
+    holdingRegs[EXEC_TIME_TRIGGER] = (micros() - motorTimeNow) % 500;
     if (positionOffset <= 500 && digitalReadFast(MOTOR_CLK))
-    {
-      delayOffset = (250 - ((micros() - motorTimeNow)%500) + positionOffset);
+    { 
+      delayOffset = (250 - holdingRegs[EXEC_TIME_TRIGGER] + positionOffset);
       TeensyDelay::trigger(delayOffset, 0);
-      holdingRegs[EXEC_TIME_TRIGGER] = micros() - exectime;
     }
 
     if (positionOffset > 500 && !digitalReadFast(MOTOR_CLK))
     {
-      delayOffset = (250 - ((micros() - motorTimeNow)%500) + (positionOffset % 500));
+      delayOffset = (250 - holdingRegs[EXEC_TIME_TRIGGER] + (positionOffset % 500));
       TeensyDelay::trigger(delayOffset, 0);
-      holdingRegs[EXEC_TIME_TRIGGER] = micros() - exectime;
     }
   }
 }

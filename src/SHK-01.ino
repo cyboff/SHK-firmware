@@ -42,9 +42,9 @@
 #define DEFAULT_THRESHOLD_SET2 50
 
 #define DEFAULT_WINDOW_BEGIN 20     // min 5, max 50
-#define DEFAULT_WINDOW_END 80      // min 50 max 95
-#define DEFAULT_POSITION_MODE 1    // hmd = 0, rising = 1, falling = 2, peak = 3
-#define DEFAULT_ANALOG_OUT_MODE 0  // an1/an2: "1Int2Pos" = 0, "1Pos2Int2" = 1, "1Int2Int" = 2, "1Pos2Pos" = 3
+#define DEFAULT_WINDOW_END 80       // min 50 max 95
+#define DEFAULT_POSITION_MODE 1     // hmd = 0, rising = 1, falling = 2, peak = 3
+#define DEFAULT_ANALOG_OUT_MODE 0   // an1/an2: "1Int2Pos" = 0, "1Pos2Int2" = 1, "1Int2Int" = 2, "1Pos2Pos" = 3
 #define DEFAULT_POSITION_OFFSET 250 // min 5, max 95 to avoid coincidence with pulse interrupts
 
 #define DEFAULT_FILTER_POSITION 6 // range 0 - 9999 ms (or nr of mirrors) for moving average
@@ -300,12 +300,12 @@ enum
   POSITION_VALUE,
   POSITION_VALUE_AVG,
 
-  AN_VALUES,                      // 25 registers
+  AN_VALUES, // 25 registers
   MOTOR_TIME_DIFF = AN_VALUES + 25,
-  EXEC_TIME_ADC,                  // exectime of adc conversions
-  EXEC_TIME,                      // exectime of adc conversions + results calculation
-  EXEC_TIME_TRIGGER,              // exectime of each triggering
-  OFFSET_DELAY,                   // calculated trigger delay
+  EXEC_TIME_ADC,     // exectime of adc conversions
+  EXEC_TIME,         // exectime of adc conversions + results calculation
+  EXEC_TIME_TRIGGER, // exectime of each triggering
+  OFFSET_DELAY,      // calculated trigger delay
   TOTAL_ERRORS,
   // leave this one
   TOTAL_REGS_SIZE
@@ -493,7 +493,7 @@ void setup()
   pinMode(MOTOR_ALARM, INPUT_PULLUP); //motor input pulses
   attachInterrupt(digitalPinToInterrupt(MOTOR_ALARM), motor_isr, FALLING);
 
-  //NVIC_SET_PRIORITY(IRQ_PORTC, 16);
+  //NVIC_SET_PRIORITY(IRQ_PORTC, 0);
 
   //motor slow start
 
@@ -2184,6 +2184,7 @@ void setPositionOffset(void)
   if (lastKey == BTN_ABH)
   { // SAVE
     positionOffset = menu_positionOffset;
+    //adc0_busy = 0;
     eeprom_writeInt(EE_ADDR_position_offset, positionOffset); //save to EEPROM
     displayPrint("SAVED!!!");
     delay(500);
@@ -2563,7 +2564,7 @@ void checkALARM()
   }
   else if (extTest)
   {
-    digitalWriteFast(OUT_ALARM_NEG, HIGH); //NO ALARM = negative output: 24V=OK
+    digitalWriteFast(OUT_ALARM_NEG, HIGH); //NO ALARM => negative output: 24V=OK , but keep LED_ALARM blinking
     if (!alarmChecked)
     {
       currentMenu = MENU_ALARM;
@@ -2572,7 +2573,7 @@ void checkALARM()
   }
   else if (intTest && (currentMenu != MENU_SETUP))
   {
-    digitalWriteFast(OUT_ALARM_NEG, HIGH); //NO ALARM = negative output: 24V=OK
+    digitalWriteFast(OUT_ALARM_NEG, HIGH); //NO ALARM => negative output: 24V=OK, but keep LED_ALARM blinking
     if (!alarmChecked)
     {
       currentMenu = MENU_ALARM;
@@ -2723,18 +2724,21 @@ void timer500us_isr(void)
   }
 
   if ((motorTimeDiff < (6000 + 50)) && (motorTimeDiff > (6000 - 50))) //motor is at full speed 6000us per rot.
-  { 
-    holdingRegs[EXEC_TIME_TRIGGER] = (micros() - motorTimeNow) % 500;
-    if (positionOffset <= 500 && digitalReadFast(MOTOR_CLK))
-    { 
-      delayOffset = (250 - holdingRegs[EXEC_TIME_TRIGGER] + positionOffset);
-      TeensyDelay::trigger(delayOffset, 0);
+  {
+    if (digitalReadFast(MOTOR_CLK))
+    {
+      holdingRegs[EXEC_TIME_TRIGGER] = (micros() - motorTimeNow) % 1000;
+      delayOffset = (1000 - holdingRegs[EXEC_TIME_TRIGGER] + positionOffset) % 1000;
     }
 
-    if (positionOffset > 500 && !digitalReadFast(MOTOR_CLK))
+    if (delayOffset <= 500 && digitalReadFast(MOTOR_CLK))
     {
-      delayOffset = (250 - holdingRegs[EXEC_TIME_TRIGGER] + (positionOffset % 500));
-      TeensyDelay::trigger(delayOffset, 0);
+        TeensyDelay::trigger(delayOffset, 0);
+    }
+
+    if (delayOffset > 500 && !digitalReadFast(MOTOR_CLK))
+    {
+        TeensyDelay::trigger(delayOffset % 500, 0);
     }
   }
 }
@@ -2773,7 +2777,7 @@ void callback_delay()
 
     NVIC_DISABLE_IRQ(IRQ_PDB);
     //Serial.println("Start PDB");
-    adc->adc0->startPDB(freq);     //check ADC_Module::startPDB() in ADC_Module.cpp for //NVIC_ENABLE_IRQ(IRQ_PDB);
+    adc->adc0->startPDB(freq); //check ADC_Module::startPDB() in ADC_Module.cpp for //NVIC_ENABLE_IRQ(IRQ_PDB);
   }
   else
   {
@@ -2815,7 +2819,7 @@ void updateResults()
     adc0Value = adc0_buf[i];
 
     //if in measuring window
-    if (((i > windowBegin * 2) && (i < windowEnd * 2) && !digitalReadFast(FILTER_PIN)) || ((i > windowBegin * 2 - 5) && (i < windowEnd * 2 + 5) && digitalReadFast(FILTER_PIN))) 
+    if (((i > windowBegin * 2) && (i < windowEnd * 2) && !digitalReadFast(FILTER_PIN)) || ((i > windowBegin * 2 - 5) && (i < windowEnd * 2 + 5) && digitalReadFast(FILTER_PIN)))
     { // from % to index of 0-200
 
       // check peak
@@ -3027,7 +3031,7 @@ void checkModbus()
   holdingRegs[IO_STATE] = io_state;
 
   holdingRegs[MOTOR_TIME_DIFF] = motorTimeDiff;
-  holdingRegs[OFFSET_DELAY] = delayOffset;
+  holdingRegs[OFFSET_DELAY] = delayOffset % 500;
 
   // updated in updateResults()
   holdingRegs[PEAK_VALUE] = peakValueDisp;
@@ -3188,6 +3192,7 @@ void checkModbus()
   {
     positionOffset = holdingRegs[POSITION_OFFSET];
     eeprom_writeInt(EE_ADDR_position_offset, positionOffset);
+    //adc0_busy = 0;
   }
 
   if (holdingRegs[FILTER_POSITION] != filterPosition && holdingRegs[FILTER_POSITION] < 10000)

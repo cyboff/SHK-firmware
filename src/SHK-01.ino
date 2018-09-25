@@ -219,7 +219,7 @@ volatile int value_buffer[25];
 //volatile int value_peak[ANALOG_BUFFER_SIZE];
 volatile int adc0Value = 0;         //analog value
 volatile int analogBufferIndex = 0; //analog buffer pointer
-volatile unsigned int delayOffset = 0;
+volatile int delayOffset = 0;
 // sensor variables
 volatile int thre256 = 75, thre = 30, thre1 = 30, thre2 = 50;
 volatile int hmdThresholdHyst = 13;
@@ -2761,7 +2761,9 @@ void motor_isr(void)
   if ((motorTimeDiff < (6000 + 50)) && (motorTimeDiff > (6000 - 50))) //motor is at full speed 6000us per rot, no motor alarm.
   {
     holdingRegs[EXEC_TIME_TRIGGER] = micros() - pulsetime;
-    delayOffset = (positionOffset - holdingRegs[EXEC_TIME_TRIGGER]) % 1000; // compensation for HALL magnets position
+    delayOffset = (positionOffset % 1000 - holdingRegs[EXEC_TIME_TRIGGER]) % 1000; // compensation for HALL magnets position
+    if (delayOffset < 0)                                                           // rotate delayOffset between 0 - 1000
+      delayOffset = 1000 + delayOffset;
     TeensyDelay::trigger(delayOffset, 0);
   }
 }

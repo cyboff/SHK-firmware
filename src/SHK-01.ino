@@ -2946,11 +2946,11 @@ void updateResults()
 
   if (extTest || intTest) // check test mode and set outputs to 50% and 12mA
   {
-    positionValueDisp = 500;    //for display range 0 - 1000
-    positionValueAvgDisp = 500; //for display range 0 - 1000
-    positionValue = 32767;      //for analog output
-    peakValueDisp = 50;         //for display range 0 - 100%
-    peakValue = 32767;
+    positionValueDisp = 500;    // 50% of display range 0 - 1000
+    positionValueAvgDisp = 500; // 50% of display range 0 - 1000
+    positionValue = 0x7FFF;     // 12mA on position analog output
+    peakValueDisp = 75;         // 75% of display range 0 - 100%      
+    peakValue = 0xBFFF;         // 16mA on intensity analog output
   }
 
   switch (analogOutMode)

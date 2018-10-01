@@ -1330,7 +1330,7 @@ void showModbusMenu(void)
     displayPrint("Sp%6d", modbusSpeed);
   if (currentMenuOption == 2)
   {
-    for (int i = 0; i < 3; i++)
+    for (int i = 0; i < 4; i++)
     { // find actual format in array
       if (modbusFormatArray[i] == modbusFormat)
         actualFormat = i;

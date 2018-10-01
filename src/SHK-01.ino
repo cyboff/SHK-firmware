@@ -440,7 +440,7 @@ void setup()
 
   holdingRegs[EXEC_TIME] = 0;
 
-  Serial.begin(modbusSpeed);
+  //Serial.begin(modbusSpeed);
 
   modbus_configure(modbusSpeed, modbusFormat, modbusID, TXEN, TOTAL_REGS_SIZE, 0);
 
@@ -459,7 +459,7 @@ void setup()
   adc->setConversionSpeed(ADC_CONVERSION_SPEED::VERY_HIGH_SPEED, ADC_0); // change the conversion speed
   // it can be ADC_VERY_LOW_SPEED, ADC_LOW_SPEED, ADC_MED_SPEED, ADC_HIGH_SPEED or ADC_VERY_HIGH_SPEED
   adc->setSamplingSpeed(ADC_SAMPLING_SPEED::VERY_HIGH_SPEED, ADC_0); // change the sampling speed
-  //adc->setReference(ADC_REFERENCE::REF_1V2, ADC_0); // use default 3.3V for input signal > 1.2V 
+  //adc->setReference(ADC_REFERENCE::REF_1V2, ADC_0); // use default 3.3V for input signal > 1.2V
 
   adc->enablePGA(pga, ADC_0);
 
@@ -517,9 +517,6 @@ void setup()
   //clear data buffers
   memset((void *)adc0_buf, 0, sizeof(adc0_buf));
   memset((void *)adc_data, 0, sizeof(adc_data));
-
-  // when motor is running, enable ADC0 interrupts
-  //adc->enableInterrupts(ADC_0);
 }
 
 void loop()
@@ -2553,7 +2550,7 @@ void checkALARM()
       currentMenuOption = 0;
     }
   } //set ALARM
-  else if (celsius > 50)
+  else if ((celsius > 55) || ((celsius > 50) && (currentMenu == MENU_ALARM) && (currentMenuOption == 1)))  // 5 deg hysteresis internal temperature alarm
   { // temp alarm
     digitalWriteFast(LED_ALARM, HIGH);
     digitalWriteFast(OUT_ALARM_NEG, LOW); //negative output 0V=ALARM
@@ -2650,8 +2647,6 @@ void timer500us_isr(void)
   digitalWriteFast(MOTOR_CLK, !digitalReadFast(MOTOR_CLK));
 
   //update timeouts
-  //if (lastSentTimeout) {lastSentTimeout--;}
-  //if (lastPressTimeout) {lastPressTimeout--;}
 
   if (refreshMenuTimeout)
   {
@@ -2724,25 +2719,6 @@ void timer500us_isr(void)
     hourTimeout--;        // every 1ms
     pulsetime = micros(); // for position compensation
   }
-
-  // if ((motorTimeDiff < (6000 + 50)) && (motorTimeDiff > (6000 - 50))) //motor is at full speed 6000us per rot.
-  // {
-  //   if (digitalReadFast(MOTOR_CLK))
-  //   {
-  //     holdingRegs[EXEC_TIME_TRIGGER] = (micros() - motorTimeNow) % 1000;
-  //     delayOffset = (1000 - holdingRegs[EXEC_TIME_TRIGGER] + positionOffset) % 1000;
-  //   }
-
-  //   if (delayOffset <= 500 && digitalReadFast(MOTOR_CLK))
-  //   {
-  //     TeensyDelay::trigger(delayOffset, 0);
-  //   }
-
-  //   if (delayOffset > 500 && !digitalReadFast(MOTOR_CLK))
-  //   {
-  //     TeensyDelay::trigger(delayOffset % 500, 0);
-  //   }
-  // }
 }
 
 // motor (from HALL sensor) interrupt
@@ -2806,7 +2782,7 @@ void adc0_dma_isr(void)
   adc0_dma.clearComplete();
   //Serial.println("DMA interrupt");
   //PDB0_CH1C1 = 0; // clear PDB channel control register - should be implemented in stopPDB()
-  //PDB0_CH0C1 = 0;
+  PDB0_CH0C1 = 0;
 
   adc->adc0->stopPDB();
   adc0_dma.disable();
@@ -2823,22 +2799,12 @@ void adc0_dma_isr(void)
 
   adc0_busy = false;
   holdingRegs[EXEC_TIME_ADC] = micros() - exectime; // exectime of adc conversions
-
-  // update outputs
-  // updateResults();
-
-  // holdingRegs[EXEC_TIME] = micros() - exectime;
 }
 
 void updateResults()
 {
   for (int i = 0; i < ANALOG_BUFFER_SIZE; i++)
   {
-
-    // if (adc0_buf[i] < 0)
-    //   adc0_buf[i] = 0;
-
-    // adc0Value = adc0_buf[i];
     adc0Value = adc_data[i];
 
     //if in measuring window
@@ -2858,15 +2824,12 @@ void updateResults()
         // check for rising edge
         if (!risingEdgeTime)
         { // only first occurence
-          //risingEdgeTime = ((micros() - motorTimeNow) % 1000); // range per mirror 0-1000 us
-          //risingEdgeTime = ((micros() - motorTimeNow + (positionOffset * 10)) % 1000); // range per mirror 0-1000 us
           risingEdgeTime = i * 5;
         }
 
         // check for peak (but signal can be unstable)
         if (peak[i - 1] + 5 < peakValue)
         {
-          //peakValueTime = ((micros() - motorTimeNow + (positionOffset * 10)) % 1000); // range per mirror 0-1000 us
           peakValueTime = i * 5;
         }
 
@@ -2876,7 +2839,6 @@ void updateResults()
                 || (i == windowEnd * 2 - 1))                    // or when real signal falling edge is not in measuring window (first occurence)
         )
         {
-          //fallingEdgeTime = ((micros() - motorTimeNow + (positionOffset * 10)) % 1000); // range per mirror 0-1000 us
           fallingEdgeTime = i * 5;
         }
 
@@ -2949,7 +2911,7 @@ void updateResults()
     positionValueDisp = 500;    // 50% of display range 0 - 1000
     positionValueAvgDisp = 500; // 50% of display range 0 - 1000
     positionValue = 0x7FFF;     // 12mA on position analog output
-    peakValueDisp = 75;         // 75% of display range 0 - 100%      
+    peakValueDisp = 75;         // 75% of display range 0 - 100%
     peakValue = 0xBFFF;         // 16mA on intensity analog output
   }
 
@@ -2975,7 +2937,6 @@ void updateResults()
     for (byte i = 0; i < (MOTOR_TIME_DIFF - AN_VALUES); i++) // MOTOR_TIME_DIFF = AN_VALUES + 25
     {
       value_buffer[i] = adc_data[i * 8 + 4] << 8 | adc_data[i * 8]; // MSB = value_buffer[i*8+4] , LSB = value_buffer[i*8] ; only 50 of 200
-      //value_peak[i] = peak[i];
     }
 
     dataSent = false;
@@ -3065,8 +3026,6 @@ void checkModbus()
   {
     for (byte i = 0; i < (MOTOR_TIME_DIFF - AN_VALUES); i++) // MOTOR_TIME_DIFF = AN_VALUES + 25
     {
-      //holdingRegs[i+AN_VALUES] = value_buffer[i*8];
-      //holdingRegs[i + AN_VALUES] = value_buffer[i * 8 + 4] << 8 | value_buffer[i * 8]; // MSB = value_buffer[i*8+4] , LSB = value_buffer[i*8] ; only 50 of 200
       holdingRegs[i + AN_VALUES] = value_buffer[i]; // values stored properly in updateResults() to save memory
     }
 
@@ -3075,7 +3034,7 @@ void checkModbus()
 
   holdingRegs[TOTAL_ERRORS] = modbus_update(holdingRegs);
 
-  // check changes made via ModBus - if values are valid, save them in eeprom
+  // check changes made via ModBus - if values are valid, save them in EEPROM
 
   if ((holdingRegs[MODBUS_ID] != modbusID) || (holdingRegs[MODBUS_SPEED] * 100 != modbusSpeed) || (holdingRegs[MODBUS_FORMAT] != modbusFormat))
   {

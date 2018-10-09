@@ -145,10 +145,11 @@ int brightness = 5; // screen brightness
 #define BTN_DEBOUNCE_TIME 200  // debounce time (*500us) to prevent flickering when pressing or releasing the button
 #define BTN_HOLD_TIME 2000     // holding period (*500us) how long to wait for press+hold event
 #define BTN_HOLD_TIME_WAIT 500 // Used for double key holding
+#define BTN_NONE_COUNTER 60    // for ESC when no button is pressed: BTN_NONE_COUNTER * 0.25s (menuRefreshTimeout) 
 
-#define TIMEOUT_MENU 1200000 // *500us = 10 mins
+#define TIMEOUT_MENU 1200000   // *500us = 10 mins
 #define TIMEOUT_LASER 1200000
-#define TIMEOUT_TEST 600000 // 5 min
+#define TIMEOUT_TEST 600000    // 5 min
 
 // display menu
 #define MENU_MAIN 1
@@ -1077,7 +1078,7 @@ void setGain1Menu(void)
   if (lastKey == BTN_NONE)
   { // ESC
     btnNoneCounter++;
-    if (btnNoneCounter > 100)
+    if (btnNoneCounter > BTN_NONE_COUNTER)
     {
       currentMenu = MENU_SENSOR;
       currentMenuOption = 0;
@@ -1128,7 +1129,7 @@ void setThre1Menu(void)
   if (lastKey == BTN_NONE)
   { // ESC
     btnNoneCounter++;
-    if (btnNoneCounter > 100)
+    if (btnNoneCounter > BTN_NONE_COUNTER)
     {
       currentMenu = MENU_SENSOR;
       currentMenuOption = 1;
@@ -1179,7 +1180,7 @@ void setGain2Menu(void)
   if (lastKey == BTN_NONE)
   { // ESC
     btnNoneCounter++;
-    if (btnNoneCounter > 100)
+    if (btnNoneCounter > BTN_NONE_COUNTER)
     {
       currentMenu = MENU_SENSOR;
       currentMenuOption = 2;
@@ -1230,7 +1231,7 @@ void setThre2Menu(void)
   if (lastKey == BTN_NONE)
   { // ESC
     btnNoneCounter++;
-    if (btnNoneCounter > 100)
+    if (btnNoneCounter > BTN_NONE_COUNTER)
     {
       currentMenu = MENU_SENSOR;
       currentMenuOption = 3;
@@ -1296,7 +1297,7 @@ void setSetMenu(void)
   if (lastKey == BTN_NONE)
   { // ESC
     btnNoneCounter++;
-    if (btnNoneCounter > 100)
+    if (btnNoneCounter > BTN_NONE_COUNTER)
     {
       currentMenu = MENU_SENSOR;
       currentMenuOption = 4;
@@ -1423,7 +1424,7 @@ void setModbusID(void)
   if (lastKey == BTN_NONE)
   { // ESC
     btnNoneCounter++;
-    if (btnNoneCounter > 100)
+    if (btnNoneCounter > BTN_NONE_COUNTER)
     {
       currentMenu = MENU_MODBUS;
       currentMenuOption = 0;
@@ -1482,7 +1483,7 @@ void setModbusSpeed(void)
   if (lastKey == BTN_NONE)
   { // ESC
     btnNoneCounter++;
-    if (btnNoneCounter > 100)
+    if (btnNoneCounter > BTN_NONE_COUNTER)
     {
       currentMenu = MENU_MODBUS;
       currentMenuOption = 1;
@@ -1541,7 +1542,7 @@ void setModbusFormat(void)
   if (lastKey == BTN_NONE)
   { // ESC
     btnNoneCounter++;
-    if (btnNoneCounter > 100)
+    if (btnNoneCounter > BTN_NONE_COUNTER)
     {
       currentMenu = MENU_MODBUS;
       currentMenuOption = 2;
@@ -1678,7 +1679,7 @@ void setFilterPosition(void)
   if (lastKey == BTN_NONE)
   { // ESC
     btnNoneCounter++;
-    if (btnNoneCounter > 100)
+    if (btnNoneCounter > BTN_NONE_COUNTER)
     {
       currentMenu = MENU_FILTERS;
       currentMenuOption = 0;
@@ -1753,7 +1754,7 @@ void setFilterOn(void)
   if (lastKey == BTN_NONE)
   { // ESC
     btnNoneCounter++;
-    if (btnNoneCounter > 100)
+    if (btnNoneCounter > BTN_NONE_COUNTER)
     {
       currentMenu = MENU_FILTERS;
       currentMenuOption = 1;
@@ -1828,7 +1829,7 @@ void setFilterOff(void)
   if (lastKey == BTN_NONE)
   { // ESC
     btnNoneCounter++;
-    if (btnNoneCounter > 100)
+    if (btnNoneCounter > BTN_NONE_COUNTER)
     {
       currentMenu = MENU_FILTERS;
       currentMenuOption = 2;
@@ -1952,7 +1953,7 @@ void setWindowBegin(void)
   if (lastKey == BTN_NONE)
   { // ESC
     btnNoneCounter++;
-    if (btnNoneCounter > 100)
+    if (btnNoneCounter > BTN_NONE_COUNTER)
     {
       currentMenu = MENU_ANALOG;
       currentMenuOption = 0;
@@ -2003,7 +2004,7 @@ void setWindowEnd(void)
   if (lastKey == BTN_NONE)
   { // ESC
     btnNoneCounter++;
-    if (btnNoneCounter > 100)
+    if (btnNoneCounter > BTN_NONE_COUNTER)
     {
       currentMenu = MENU_ANALOG;
       currentMenuOption = 1;
@@ -2055,7 +2056,7 @@ void setPositionMode(void)
   if (lastKey == BTN_NONE)
   { // ESC
     btnNoneCounter++;
-    if (btnNoneCounter > 100)
+    if (btnNoneCounter > BTN_NONE_COUNTER)
     {
       currentMenu = MENU_ANALOG;
       currentMenuOption = 2;
@@ -2107,7 +2108,7 @@ void setAnalogOutMode(void)
   if (lastKey == BTN_NONE)
   { // ESC
     btnNoneCounter++;
-    if (btnNoneCounter > 100)
+    if (btnNoneCounter > BTN_NONE_COUNTER)
     {
       currentMenu = MENU_ANALOG;
       currentMenuOption = 3;
@@ -2167,7 +2168,7 @@ void setPositionOffset(void)
   if (lastKey == BTN_NONE)
   { // ESC
     btnNoneCounter++;
-    if (btnNoneCounter > 100)
+    if (btnNoneCounter > BTN_NONE_COUNTER)
     {
       currentMenu = MENU_ANALOG;
       currentMenuOption = 4;
@@ -2289,7 +2290,7 @@ void showResetMenu(void)
   if (lastKey == BTN_NONE)
   { // ESC
     btnNoneCounter++;
-    if (btnNoneCounter > 100)
+    if (btnNoneCounter > BTN_NONE_COUNTER)
     {
       currentMenu = MENU_INFO;
       currentMenuOption = 5;

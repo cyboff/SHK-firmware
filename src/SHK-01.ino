@@ -41,8 +41,17 @@
 #define DEFAULT_GAIN_SET2 32
 #define DEFAULT_THRESHOLD_SET2 50
 
-#define DEFAULT_WINDOW_BEGIN 20     // min 5, max 50
-#define DEFAULT_WINDOW_END 80       // min 50 max 95
+#if MODEL_TYPE == 10
+ #define DEFAULT_WINDOW_BEGIN 45 // min 5, max 50
+ #define DEFAULT_WINDOW_END 55   // min 50 max 95
+#elif MODEL_TYPE == 30
+ #define DEFAULT_WINDOW_BEGIN 35 // min 5, max 50
+ #define DEFAULT_WINDOW_END 65   // min 50 max 95
+#else
+ #define DEFAULT_WINDOW_BEGIN 20 // min 5, max 50
+ #define DEFAULT_WINDOW_END 80   // min 50 max 95
+#endif
+
 #define DEFAULT_POSITION_MODE 1     // hmd = 0, rising = 1, falling = 2, peak = 3
 #define DEFAULT_ANALOG_OUT_MODE 0   // an1/an2: "1Int2Pos" = 0, "1Pos2Int2" = 1, "1Int2Int" = 2, "1Pos2Pos" = 3
 #define DEFAULT_POSITION_OFFSET 250 // min 5, max 95 to avoid coincidence with pulse interrupts
@@ -145,11 +154,11 @@ int brightness = 5; // screen brightness
 #define BTN_DEBOUNCE_TIME 200  // debounce time (*500us) to prevent flickering when pressing or releasing the button
 #define BTN_HOLD_TIME 2000     // holding period (*500us) how long to wait for press+hold event
 #define BTN_HOLD_TIME_WAIT 500 // Used for double key holding
-#define BTN_NONE_COUNTER 60    // for ESC when no button is pressed: BTN_NONE_COUNTER * 0.25s (menuRefreshTimeout) 
+#define BTN_NONE_COUNTER 60    // for ESC when no button is pressed: BTN_NONE_COUNTER * 0.25s (menuRefreshTimeout)
 
-#define TIMEOUT_MENU 1200000   // *500us = 10 mins
+#define TIMEOUT_MENU 1200000 // *500us = 10 mins
 #define TIMEOUT_LASER 1200000
-#define TIMEOUT_TEST 600000    // 5 min
+#define TIMEOUT_TEST 600000 // 5 min
 
 // display menu
 #define MENU_MAIN 1
@@ -2550,9 +2559,9 @@ void checkALARM()
       currentMenu = MENU_ALARM;
       currentMenuOption = 0;
     }
-  } //set ALARM
-  else if ((celsius > 55) || ((celsius > 50) && (currentMenu == MENU_ALARM) && (currentMenuOption == 1)))  // 5 deg hysteresis internal temperature alarm
-  { // temp alarm
+  }                                                                                                       //set ALARM
+  else if ((celsius > 55) || ((celsius > 50) && (currentMenu == MENU_ALARM) && (currentMenuOption == 1))) // 5 deg hysteresis internal temperature alarm
+  {                                                                                                       // temp alarm
     digitalWriteFast(LED_ALARM, HIGH);
     digitalWriteFast(OUT_ALARM_NEG, LOW); //negative output 0V=ALARM
     if (!alarmChecked)

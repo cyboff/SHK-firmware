@@ -42,14 +42,14 @@
 #define DEFAULT_THRESHOLD_SET2 50
 
 #if MODEL_TYPE == 10
- #define DEFAULT_WINDOW_BEGIN 45 // min 5, max 50
- #define DEFAULT_WINDOW_END 55   // min 50 max 95
+#define DEFAULT_WINDOW_BEGIN 45 // min 5, max 50
+#define DEFAULT_WINDOW_END 55   // min 50 max 95
 #elif MODEL_TYPE == 30
- #define DEFAULT_WINDOW_BEGIN 35 // min 5, max 50
- #define DEFAULT_WINDOW_END 65   // min 50 max 95
+#define DEFAULT_WINDOW_BEGIN 35 // min 5, max 50
+#define DEFAULT_WINDOW_END 65   // min 50 max 95
 #else
- #define DEFAULT_WINDOW_BEGIN 20 // min 5, max 50
- #define DEFAULT_WINDOW_END 80   // min 50 max 95
+#define DEFAULT_WINDOW_BEGIN 20 // min 5, max 50
+#define DEFAULT_WINDOW_END 80   // min 50 max 95
 #endif
 
 #define DEFAULT_POSITION_MODE 1     // hmd = 0, rising = 1, falling = 2, peak = 3
@@ -2817,44 +2817,62 @@ void updateResults()
   {
     adc0Value = adc_data[i];
 
-    //if in measuring window
-    if (((i > windowBegin * 2) && (i < windowEnd * 2) && !digitalReadFast(FILTER_PIN)) || ((i > windowBegin * 2 - 5) && (i < windowEnd * 2 + 5) && digitalReadFast(FILTER_PIN)))
-    { // from % to index of 0-200
+    // check peak
+    if (adc0Value > peakValue)
+    {
+      peakValue = adc0Value;
+    }
 
-      // check peak
-      if (adc0Value > peakValue)
-      {
-        peakValue = adc0Value;
-      }
+    // HMD mode
+    if ((positionMode == 0) && (adc0Value > thre256 + hmdThresholdHyst) || (digitalReadFast(FILTER_PIN) && (adc0Value > thre256 - hmdThresholdHyst)) // signal crossed threshold in measuring window
+                                                                               && ((i > windowBegin * 2) && (i < windowEnd * 2) && !digitalReadFast(FILTER_PIN)) ||
+        ((i > windowBegin * 2 - 5) && (i < windowEnd * 2 + 5) && digitalReadFast(FILTER_PIN)))
+    {                                     // if value is inside the measuring window (with 5% hysteresis)
+      digitalWriteFast(FILTER_PIN, HIGH); // update internal pin for bounce2 filter
+    }
 
-      // check threshold crossing
-      if ((peakValue > thre256 + hmdThresholdHyst) || (digitalReadFast(LED_SIGNAL) && (peakValue > thre256 - hmdThresholdHyst)))
-      {
-
-        // check for rising edge
-        if (!risingEdgeTime)
-        { // only first occurence
-          risingEdgeTime = i * 5;
-        }
-
-        // check for peak (but signal can be unstable)
-        if (peak[i - 1] + 5 < peakValue)
-        {
-          peakValueTime = i * 5;
-        }
-
-        // check for falling edge
-        if (!fallingEdgeTime                                    // only the first occurence
-            && ((adc0Value < (thre256 - hmdThresholdHyst - 13)) // added additional hysteresis to avoid flickering
-                || (i == windowEnd * 2 - 1))                    // or when real signal falling edge is not in measuring window (first occurence)
-        )
-        {
-          fallingEdgeTime = i * 5;
-        }
-
-        peak[i] = peakValue;
+    // check for rising edge
+    if ((positionMode == 1) && (!risingEdgeTime)                                      // only first occurence
+            && (peakValue > thre256 + hmdThresholdHyst)                               // check threshold crossing
+        || (digitalReadFast(FILTER_PIN) && (peakValue > thre256 - hmdThresholdHyst))) // hysteresis
+    {
+      risingEdgeTime = i * 5;
+      // check SIGNAL PRESENT in measuring window
+      if (((i > windowBegin * 2) && (i < windowEnd * 2) && !digitalReadFast(FILTER_PIN)) || ((i > windowBegin * 2 - 5) && (i < windowEnd * 2 + 5) && digitalReadFast(FILTER_PIN)))
+      {                                     // if rising edge is inside the measuring window (with 5% hysteresis)
+        digitalWriteFast(FILTER_PIN, HIGH); // update internal pin for bounce2 filter
       }
     }
+
+    // check for falling edge
+    if ((positionMode == 2) && (!fallingEdgeTime)                                     // only the first occurence
+            && ((adc0Value < (thre256 - hmdThresholdHyst - 13))                       // added additional hysteresis to avoid flickering
+                || (i == windowEnd * 2 - 1))                                          // or when real signal falling edge is not in measuring window (first occurence)
+            && (peakValue > thre256 + hmdThresholdHyst)                               // check threshold crossing
+        || (digitalReadFast(FILTER_PIN) && (peakValue > thre256 - hmdThresholdHyst))) // hysteresis
+    {
+      fallingEdgeTime = i * 5;
+      // check SIGNAL PRESENT in measuring window
+      if (((i > windowBegin * 2) && (i < windowEnd * 2) && !digitalReadFast(FILTER_PIN)) || ((i > windowBegin * 2 - 5) && (i < windowEnd * 2 + 5) && digitalReadFast(FILTER_PIN)))
+      {                                     // if falling edge is inside the measuring window
+        digitalWriteFast(FILTER_PIN, HIGH); // update internal pin for bounce2 filter
+      }
+    }
+
+    // check for peak (but signal can be unstable)
+    if ((positionMode == 3) && (peak[i - 1] + 5 < peakValue)                          // check for peak
+            && (peakValue > thre256 + hmdThresholdHyst)                               // check threshold crossing
+        || (digitalReadFast(FILTER_PIN) && (peakValue > thre256 - hmdThresholdHyst))) // hysteresis
+    {
+      peakValueTime = i * 5;
+      // check SIGNAL PRESENT in measuring window
+      if (((i > windowBegin * 2) && (i < windowEnd * 2) && !digitalReadFast(FILTER_PIN)) || ((i > windowBegin * 2 - 5) && (i < windowEnd * 2 + 5) && digitalReadFast(FILTER_PIN)))
+      {                                     // if peak is inside the measuring window
+        digitalWriteFast(FILTER_PIN, HIGH); // update internal pin for bounce2 filter
+      }
+    }
+
+    peak[i] = peakValue;
   }
 
   // check SIGNAL PRESENT
@@ -2865,7 +2883,7 @@ void updateResults()
     //digitalWriteFast(OUT_SIGNAL, LOW);
   }
 
-  if ((peakValue > thre256 + hmdThresholdHyst) || extTest || intTest)
+  if (extTest || intTest)
   {
     digitalWriteFast(FILTER_PIN, HIGH); // update internal pin for bounce2 filter
     // digitalWriteFast(LED_SIGNAL, HIGH);

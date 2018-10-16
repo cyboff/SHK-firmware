@@ -224,10 +224,7 @@ DMAChannel adc0_dma;
 //extern void adc0_dma_isr(void);
 
 volatile int adc_data[ANALOG_BUFFER_SIZE]; // ADC_0 9-bit resolution for differential - sign + 8 bit
-volatile int peak[ANALOG_BUFFER_SIZE];
 volatile int value_buffer[25];
-//volatile int value_peak[ANALOG_BUFFER_SIZE];
-volatile int adc0Value = 0;         //analog value
 volatile int analogBufferIndex = 0; //analog buffer pointer
 volatile int delayOffset = 0;
 // sensor variables
@@ -2813,22 +2810,24 @@ void adc0_dma_isr(void)
 
 void updateResults()
 {
+  int peak[ANALOG_BUFFER_SIZE] = {0};
+
   for (int i = 0; i < ANALOG_BUFFER_SIZE; i++)
   {
-    adc0Value = adc_data[i];
-
     //if in measuring window
     if (((i > windowBegin * 2) && (i < windowEnd * 2) && !digitalReadFast(FILTER_PIN)) || ((i > windowBegin * 2 - 5) && (i < windowEnd * 2 + 5) && digitalReadFast(FILTER_PIN)))
     { // from % to index of 0-200
 
       // check peak
-      if (adc0Value > peakValue)
+      if (adc_data[i] > peakValue)
       {
-        peakValue = adc0Value;
+        peakValue = adc_data[i];
       }
 
+      peak[i] = peakValue;
+
       // check threshold crossing
-      if ((peakValue > thre256 + hmdThresholdHyst) || (digitalReadFast(LED_SIGNAL) && (peakValue > thre256 - hmdThresholdHyst)))
+      if ((peakValue > thre256 + hmdThresholdHyst) || (digitalReadFast(FILTER_PIN) && (peakValue > thre256 - hmdThresholdHyst)))
       {
 
         // check for rising edge
@@ -2845,14 +2844,12 @@ void updateResults()
 
         // check for falling edge
         if (!fallingEdgeTime                                    // only the first occurence
-            && ((adc0Value < (thre256 - hmdThresholdHyst - 13)) // added additional hysteresis to avoid flickering
+            && ((adc_data[i] < (thre256 - hmdThresholdHyst - 13)) // added additional hysteresis to avoid flickering
                 || (i == windowEnd * 2 - 1))                    // or when real signal falling edge is not in measuring window (first occurence)
         )
         {
           fallingEdgeTime = i * 5;
         }
-
-        peak[i] = peakValue;
       }
     }
   }

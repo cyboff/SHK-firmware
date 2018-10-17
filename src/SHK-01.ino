@@ -42,14 +42,14 @@
 #define DEFAULT_THRESHOLD_SET2 50
 
 #if MODEL_TYPE == 10
-#define DEFAULT_WINDOW_BEGIN 45 // min 5, max 50
-#define DEFAULT_WINDOW_END 55   // min 50 max 95
+#define DEFAULT_WINDOW_BEGIN 45 // min 5, max 45
+#define DEFAULT_WINDOW_END 55   // min 55 max 95
 #elif MODEL_TYPE == 30
-#define DEFAULT_WINDOW_BEGIN 35 // min 5, max 50
-#define DEFAULT_WINDOW_END 65   // min 50 max 95
+#define DEFAULT_WINDOW_BEGIN 35 // min 5, max 45
+#define DEFAULT_WINDOW_END 65   // min 55 max 95
 #else
-#define DEFAULT_WINDOW_BEGIN 20 // min 5, max 50
-#define DEFAULT_WINDOW_END 80   // min 50 max 95
+#define DEFAULT_WINDOW_BEGIN 20 // min 5, max 45
+#define DEFAULT_WINDOW_END 80   // min 55 max 95
 #endif
 
 #define DEFAULT_POSITION_MODE 1     // hmd = 0, rising = 1, falling = 2, peak = 3
@@ -224,7 +224,6 @@ DMAChannel adc0_dma;
 //extern void adc0_dma_isr(void);
 
 volatile int adc_data[ANALOG_BUFFER_SIZE]; // ADC_0 9-bit resolution for differential - sign + 8 bit
-volatile int peak[ANALOG_BUFFER_SIZE];
 volatile int value_buffer[25];
 //volatile int value_peak[ANALOG_BUFFER_SIZE];
 volatile int adc0Value = 0;         //analog value
@@ -348,20 +347,14 @@ IntervalTimer timer500us; // timer for motor speed and various timeouts
 int startTimerValue0 = 0;
 
 volatile int motorPulseIndex = 0;
-volatile long motorTimeOld;
-volatile long motorTimeNow;
-volatile int motorTimeDiff;
+volatile long motorTimeOld = 0;
+volatile long motorTimeNow = 0;
+volatile int motorTimeDiff = 0;
 
-volatile long risingEdgeTime = 0;
-volatile long fallingEdgeTime = 0;
-volatile long peakValueTime = 0;
-volatile long risingEdgeTimeDisp = 0;
-volatile long fallingEdgeTimeDisp = 0;
 volatile long peakValueTimeDisp = 0;
-volatile int peakValue = 0;
 volatile int peakValueDisp = 0;
-volatile int positionValue = 0, positionValueDisp = 0;
-volatile int positionValueAvg = 0, positionValueAvgDisp = 0;
+volatile int positionValueDisp = 0;
+volatile int positionValueAvgDisp = 0;
 
 // button interrupt
 #define STATE_NORMAL 0
@@ -1953,10 +1946,10 @@ void setWindowBegin(void)
     menu_windowBegin = menu_windowBegin + 5;
   }
 
-  //check range, min 5, max 50
+  //check range, min 5, max 45
   if (menu_windowBegin < 5)
-    menu_windowBegin = 50;
-  if (menu_windowBegin > 50)
+    menu_windowBegin = 45;
+  if (menu_windowBegin > 45)
     menu_windowBegin = 5;
 
   if (lastKey == BTN_NONE)
@@ -2004,11 +1997,11 @@ void setWindowEnd(void)
     menu_windowEnd = menu_windowEnd + 5;
   }
 
-  //check range, min 50, max 95
-  if (menu_windowEnd < 50)
+  //check range, min 55, max 95
+  if (menu_windowEnd < 55)
     menu_windowEnd = 95;
   if (menu_windowEnd > 95)
-    menu_windowEnd = 50;
+    menu_windowEnd = 55;
 
   if (lastKey == BTN_NONE)
   { // ESC
@@ -2813,89 +2806,90 @@ void adc0_dma_isr(void)
 
 void updateResults()
 {
+  int hmdThreshold = 0;
+  int winBegin = 0;
+  int winEnd = 0;
+  int peakValue = 0;
+  int peak[ANALOG_BUFFER_SIZE] = {0};
+  long risingEdgeTime = 0;
+  long fallingEdgeTime = 0;
+  long peakValueTime = 0;
+  int positionValue = 0;
+  int positionValueAvg = 0;
+
   for (int i = 0; i < ANALOG_BUFFER_SIZE; i++)
   {
-    adc0Value = adc_data[i];
-
-    // check peak
-    if (adc0Value > peakValue)
+    // calculate thresholds (with hysteresis) first for speed up calculation
+    if (!digitalReadFast(FILTER_PIN))
     {
-      peakValue = adc0Value;
+      hmdThreshold = thre256 + hmdThresholdHyst;
+      winBegin = windowBegin * 2;
+      winEnd = windowEnd * 2;
+    }
+    else
+    {
+      hmdThreshold = thre256 - hmdThresholdHyst;
+      winBegin = windowBegin * 2 - 5;
+      winEnd = windowEnd * 2 + 5;
     }
 
-    if ((peakValue > thre256 + hmdThresholdHyst) || (digitalReadFast(FILTER_PIN) && (peakValue > thre256 - hmdThresholdHyst))) // check threshold crossing with hysteresis
+    if (i == winBegin)
+      peak[i] = adc_data[i]; //check first peak
+
+    if ((i > winBegin) && (i < winEnd)) // if value is inside the measuring window
     {
-      // HMD mode
-      if ((positionMode == 0) && (!peakValueTime)) // only first occurence
+      // check peak
+      if (adc_data[i] > peakValue)
       {
-        if (((i > windowBegin * 2) && (i < windowEnd * 2) && !digitalReadFast(FILTER_PIN)) || ((i > windowBegin * 2 - 5) && (i < windowEnd * 2 + 5) && digitalReadFast(FILTER_PIN))) // if value is inside the measuring window (with 5% hysteresis)
-        {
-          digitalWriteFast(FILTER_PIN, HIGH); // update internal pin for bounce2 filter
-          peakValueTime = i * 5;
-        }
-        else
-        {
-          digitalWriteFast(FILTER_PIN, LOW);
-        }
+        peakValue = adc_data[i];
       }
+      peak[i] = peakValue;
 
-      // RISING EDGE mode
-      if ((positionMode == 1) && (!risingEdgeTime)) // only first occurence
+      // check threshold crossing
+      if (peakValue > hmdThreshold) // check threshold crossing with hysteresis
       {
-        risingEdgeTime = i * 5;
-        // check SIGNAL PRESENT in measuring window
-        if (((i > windowBegin * 2) && (i < windowEnd * 2) && !digitalReadFast(FILTER_PIN)) || ((i > windowBegin * 2 - 5) && (i < windowEnd * 2 + 5) && digitalReadFast(FILTER_PIN)))
-        {                                     // if rising edge is inside the measuring window (with 5% hysteresis)
-          digitalWriteFast(FILTER_PIN, HIGH); // update internal pin for bounce2 filter
-        }
-        else
-        {
-          digitalWriteFast(FILTER_PIN, LOW);
-        }
-      }
-
-      // check for falling edge
-      if ((positionMode == 2) && (!fallingEdgeTime)) // only the first occurence
-      {
-        if (adc0Value < (thre256 - hmdThresholdHyst - 13)) // added additional hysteresis to avoid flickering
-        {
-          fallingEdgeTime = i * 5;
-          // check SIGNAL PRESENT in measuring window
-          if (((i > windowBegin * 2) && (i < windowEnd * 2) && !digitalReadFast(FILTER_PIN)) || ((i > windowBegin * 2 - 5) && (i < windowEnd * 2 + 5) && digitalReadFast(FILTER_PIN)))
-          {                                     // if falling edge is inside the measuring window
-            digitalWriteFast(FILTER_PIN, HIGH); // update internal pin for bounce2 filter
-          }
-          else
-          {
-            digitalWriteFast(FILTER_PIN, LOW);
-          }
-        }
-      }
-
-      // check for peak (but signal can be unstable)
-      if (positionMode == 3)
-      {
-        if (peak[i - 1] + 5 < peakValue) // check for peak
+        // HMD mode
+        if ((positionMode == 0) && !peakValueTime) 
         {
           peakValueTime = i * 5;
-          // check SIGNAL PRESENT in measuring window
-          if (((i > windowBegin * 2) && (i < windowEnd * 2) && !digitalReadFast(FILTER_PIN)) || ((i > windowBegin * 2 - 5) && (i < windowEnd * 2 + 5) && digitalReadFast(FILTER_PIN)))
-          {                                     // if peak is inside the measuring window
+          digitalWriteFast(FILTER_PIN, HIGH); // update internal pin for bounce2 filter
+        }
+
+        // RISING EDGE mode
+        if ((positionMode == 1) && (!risingEdgeTime)) // only first occurence
+        {
+          if (peak[i - 1] <= hmdThreshold)
+          {
+            risingEdgeTime = i * 5;
             digitalWriteFast(FILTER_PIN, HIGH); // update internal pin for bounce2 filter
           }
-          else
+        }
+
+        // check for falling edge
+        if (positionMode == 2) // only the first occurence
+        {
+          if ((adc_data[i] < thre256 - hmdThresholdHyst) && (!fallingEdgeTime))// added additional hysteresis to avoid flickering
           {
-            digitalWriteFast(FILTER_PIN, LOW);
+            fallingEdgeTime = i * 5;
+            digitalWriteFast(FILTER_PIN, HIGH); // update internal pin for bounce2 filter
+          }
+        }
+
+        // check for peak (but signal can be unstable)
+        if (positionMode == 3)
+        {
+          if (peak[i - 1] + 5 < peakValue) // check for peak
+          {
+            peakValueTime = i * 5;
+            digitalWriteFast(FILTER_PIN, HIGH); // update internal pin for bounce2 filter
           }
         }
       }
     }
-
-    peak[i] = peakValue;
   }
 
   // check SIGNAL PRESENT
-  if (peakValue < thre256 - hmdThresholdHyst)
+  if ((peakValue < thre256 - hmdThresholdHyst) || (!peakValueTime && !risingEdgeTime && !fallingEdgeTime))
   {
     digitalWriteFast(FILTER_PIN, LOW);
   }
@@ -2989,12 +2983,6 @@ void updateResults()
 
     dataSent = false;
   }
-
-  // reset values
-  peakValue = 0;
-  risingEdgeTime = 0;
-  peakValueTime = 0;
-  fallingEdgeTime = 0;
 }
 
 // exponential moving average
@@ -3194,13 +3182,13 @@ void checkModbus()
     eeprom_writeInt(EE_ADDR_threshold_set2, thre2);
   }
 
-  if (holdingRegs[WINDOW_BEGIN] != windowBegin && holdingRegs[WINDOW_BEGIN] >= 5 && holdingRegs[WINDOW_BEGIN] <= 50)
+  if (holdingRegs[WINDOW_BEGIN] != windowBegin && holdingRegs[WINDOW_BEGIN] >= 5 && holdingRegs[WINDOW_BEGIN] <= 45)
   {
     windowBegin = holdingRegs[WINDOW_BEGIN];
     eeprom_writeInt(EE_ADDR_window_begin, windowBegin);
   }
 
-  if (holdingRegs[WINDOW_END] != windowEnd && holdingRegs[WINDOW_END] >= 50 && holdingRegs[WINDOW_END] <= 95)
+  if (holdingRegs[WINDOW_END] != windowEnd && holdingRegs[WINDOW_END] >= 55 && holdingRegs[WINDOW_END] <= 95)
   {
     windowEnd = holdingRegs[WINDOW_END];
     eeprom_writeInt(EE_ADDR_window_end, windowEnd);
